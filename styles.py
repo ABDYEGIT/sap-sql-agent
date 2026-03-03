@@ -1,16 +1,16 @@
 """
-SAP Open SQL Generator - Stil Modulu.
+Yorglass SAP AI Platform - Stil Modulu.
 """
 import streamlit as st
 
 
-def inject_sap_css():
-    """SAP agent icin ozel CSS enjekte eder."""
+def inject_platform_css():
+    """Platform icin ozel CSS enjekte eder."""
     st.markdown("""
     <style>
-    /* Sidebar branding */
+    /* Sidebar branding - Yorglass */
     [data-testid="stSidebar"]::before {
-        content: "SAP SQL";
+        content: "YORGLASS";
         display: block;
         font-size: 1.5rem;
         font-weight: 800;
@@ -22,7 +22,7 @@ def inject_sap_css():
         margin-bottom: 4px;
     }
     [data-testid="stSidebar"]::after {
-        content: "Open SQL Generator";
+        content: "SAP AI Platform";
         display: block;
         font-size: 0.72rem;
         color: rgba(250,250,250,0.45);
@@ -46,7 +46,7 @@ def inject_sap_css():
         margin-bottom: 0.5rem;
     }
 
-    /* Metadata cards */
+    /* Metadata cards (SQL tablolari ve BAPI'ler icin) */
     .metadata-card {
         background: rgba(255,87,34,0.06);
         border: 1px solid rgba(255,87,34,0.12);

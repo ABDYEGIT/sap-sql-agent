@@ -4,3 +4,4 @@ openai
 plotly
 openpyxl
 python-dotenv
+chromadb

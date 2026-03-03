@@ -1,7 +1,13 @@
 """
-SAP Open SQL Generator - LLM Agent Modulu.
+SQL Agent - LLM ile SAP Open SQL Sorgusu Uretimi.
 
-OpenAI API ile dogal dilden SAP Open SQL sorgusu uretimi.
+OpenAI API kullanarak dogal dil sorusundan SAP Open SQL sorgusu uretir.
+
+RAG ENTEGRASYONU:
+- find_relevant_tables_with_rag() ile vector search yapilir
+- Bulunan tablolar format_metadata_for_prompt() ile prompt'a eklenir
+- LLM bu zenginlestirilmis prompt ile SQL uretir
+  (RAG ADIM 4: GENERATION)
 """
 import os
 import re
@@ -11,8 +17,11 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from config import OPENAI_MODEL, MAX_CHAT_HISTORY, MAX_TOKENS_RESPONSE, TEMPERATURE
-from prompts import get_system_prompt
-from metadata_loader import format_metadata_for_prompt, find_relevant_tables
+from sql_agent.prompts import get_system_prompt
+from sql_agent.metadata_loader import (
+    find_relevant_tables_with_rag,
+    format_metadata_for_prompt,
+)
 
 
 def _get_api_key() -> str:
@@ -25,27 +34,40 @@ def _get_api_key() -> str:
     except Exception:
         pass
     try:
-        _env_path = Path(__file__).resolve().parent / ".env"
+        _env_path = Path(__file__).resolve().parent.parent / ".env"
         load_dotenv(_env_path, override=True)
     except Exception:
         pass
     return os.getenv("OPENAI_API_KEY", "")
 
 
+# ══════════════════════════════════════════════════════════════════════
+# RAG ADIM 4: GENERATION - Zenginlestirilmis Prompt ile SQL Uretimi
+# ══════════════════════════════════════════════════════════════════════
+# Bu fonksiyon RAG pipeline'inin son adimini gerceklestirir:
+# 1. Vector search ile bulunan tablolar (RETRIEVAL sonucu)
+# 2. Bu tablolarin metadata'si prompt'a eklenir (AUGMENTATION)
+# 3. LLM bu zenginlestirilmis prompt ile SQL sorgusu uretir (GENERATION)
+# ══════════════════════════════════════════════════════════════════════
+
 def generate_sql(
     question: str,
     tables: dict,
     relationships: list,
     chat_history: list,
+    rag_engine=None,
 ) -> tuple:
     """
     Dogal dil sorusundan SAP Open SQL sorgusu uretir.
+
+    ── RAG GENERATION: Vector search sonuclari + LLM = SQL sorgusu ──
 
     Args:
         question: Kullanicinin Turkce sorusu
         tables: Metadata dict (tablo -> alanlar)
         relationships: Iliski listesi
         chat_history: Onceki mesajlar
+        rag_engine: RAGEngine instance (None ise tum tablolar kullanilir)
 
     Returns:
         (full_response_text, list_of_used_table_names)
@@ -54,15 +76,23 @@ def generate_sql(
     if not api_key:
         return "API anahtari bulunamadi. .env dosyanizi kontrol edin.", []
 
-    # Token tasarrufu: sadece ilgili tablolari gonder
-    relevant_tables, relevant_rels = find_relevant_tables(
-        tables, relationships, question
-    )
+    # ── RAG ADIM 2+3: RETRIEVAL + AUGMENTATION ──
+    # Vector search ile ilgili tablolari bul ve prompt'a ekle
+    if rag_engine is not None:
+        # VECTOR SEARCH ile en yakin tablolari bul
+        relevant_tables, relevant_rels = find_relevant_tables_with_rag(
+            tables, relationships, question, rag_engine
+        )
+    else:
+        # RAG yoksa tum tablolari kullan (fallback)
+        relevant_tables = tables
+        relevant_rels = relationships
 
     if not relevant_tables:
         relevant_tables = tables
         relevant_rels = relationships
 
+    # ── AUGMENTATION: Bulunan tablolari LLM prompt'una ekle ──
     metadata_text = format_metadata_for_prompt(relevant_tables, relevant_rels)
     system_prompt = get_system_prompt(metadata_text)
 
@@ -76,6 +106,7 @@ def generate_sql(
     messages.append({"role": "user", "content": question})
 
     try:
+        # ── GENERATION: LLM ile SQL uret ──
         client = OpenAI(api_key=api_key)
         response = client.chat.completions.create(
             model=OPENAI_MODEL,

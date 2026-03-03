@@ -1,5 +1,5 @@
 """
-SAP Open SQL Generator - Konfigurasyon.
+Yorglass SAP AI Platform - Konfigurasyon.
 """
 import os
 from pathlib import Path
@@ -23,9 +23,13 @@ def _resolve_api_key() -> str:
 OPENAI_API_KEY = _resolve_api_key()
 OPENAI_MODEL = "gpt-4o-mini"
 
-# SAP Agent ayarlari
-APP_TITLE = "SAP Open SQL Generator"
-APP_ICON = "\U0001f527"
+# ── Embedding modeli (RAG / Vector Search icin) ──
+# text-embedding-3-small: 1536 boyutlu vektor, ucuz ve hizli
+EMBEDDING_MODEL = "text-embedding-3-small"
+
+# Platform ayarlari
+APP_TITLE = "Yorglass SAP AI Platform"
+APP_ICON = "\U0001f3ed"  # Fabrika emoji
 MAX_CHAT_HISTORY = 10
 MAX_TOKENS_RESPONSE = 2000
 TEMPERATURE = 0.2
