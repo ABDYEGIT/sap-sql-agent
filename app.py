@@ -5,6 +5,7 @@ Sidebar'da agent secimi ile farkli SAP AI agent'larini calistirir.
 Mevcut Agent'lar:
   1. SQL Generator Agent - Dogal dilden SAP Open SQL sorgusu uretimi
   2. BAPI Asistani Agent - BAPI parametre doldurma rehberi
+  3. SD/MM Agent - SQL ve BAPI agent'larini orkestre eden birlesik agent
 """
 import sys
 from pathlib import Path
@@ -36,6 +37,7 @@ with st.sidebar:
     agent_options = {
         "SQL Generator": "sql",
         "BAPI Asistani": "bapi",
+        "SD/MM Agent": "sdmm",
     }
     selected_agent_label = st.selectbox(
         "Calismak istediginiz agent'i secin:",
@@ -57,3 +59,7 @@ if selected_agent == "sql":
 elif selected_agent == "bapi":
     from bapi_agent.page import render_bapi_agent
     render_bapi_agent()
+
+elif selected_agent == "sdmm":
+    from sd_mm_agent.page import render_sdmm_agent
+    render_sdmm_agent()
