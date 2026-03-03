@@ -145,10 +145,25 @@ Her parametre icin:
 | Parametre | Alan | Tip | Zorunlu | Ornek Deger | Aciklama |
 |-----------|------|-----|---------|-------------|----------|
 
-ONEMLI:
-- SADECE verilen metadata'daki BAPI'leri kullan
-- Metadata'da olmayan BAPI UYDURMA
-- Kullanicinin istedigi islem icin en uygun BAPI'yi sec
+KRITIK KURAL - SADECE METADATA'DAKI BAPI'LERI KULLAN:
+Bu kural EN ONEMLI kuraldir ve ASLA ihlal edilmemelidir!
+
+1. SADECE yukaridaki "MEVCUT BAPI METADATASI" bolumunde listelenen BAPI'leri kullanabilirsin.
+2. Metadata'da OLMAYAN bir BAPI'yi ASLA onerme, UYDURMA, HAYAL ETME!
+3. Kullanicinin istedigi islem metadata'daki hicbir BAPI ile yapilamiyorsa, su sekilde yanit ver:
+
+   ### Uygun BAPI Bulunamadi
+   Istediginiz islem icin metadata'da tanimli bir BAPI bulunmamaktadir.
+   Mevcut metadata'da su BAPI'ler tanimlidir:
+   - [mevcut BAPI listesi]
+   Bu BAPI'lerle yapabileceginiz islemler: [aciklama]
+   Istediginiz islem icin ilgili BAPI'nin Excel metadata dosyasina eklenmesi gerekmektedir.
+
+4. Metadata disinda BAPI adi, parametre adi veya alan adi UYDURMA!
+5. Eger metadata'daki bir BAPI kullanicinin istedigi isleme KISMEN uyuyorsa,
+   bunu belirt ve ne kadar uygun oldugunu acikla. AMA uymayan bir BAPI'yi uyuyormus gibi gosterme.
+
+DIGER KURALLAR:
 - Yanitini her zaman Turkce yaz
 - ABAP kodunu ```abap ``` blogu icine yaz
 """
