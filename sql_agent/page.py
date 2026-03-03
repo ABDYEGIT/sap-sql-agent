@@ -77,8 +77,11 @@ def render_sql_agent():
                 # ══════════════════════════════════════════
                 rag = _get_rag_engine()
                 if rag:
-                    index_tables_for_rag(tables, rag)
-                    st.success(f"{len(tables)} tablo yuklendi ve indexlendi (RAG)")
+                    try:
+                        index_tables_for_rag(tables, rag)
+                        st.success(f"{len(tables)} tablo yuklendi ve indexlendi (RAG)")
+                    except Exception as e:
+                        st.warning(f"{len(tables)} tablo yuklendi (RAG indexleme hatasi: {e})")
                 else:
                     st.success(f"{len(tables)} tablo yuklendi")
 
@@ -95,7 +98,10 @@ def render_sql_agent():
                     # RAG indexleme
                     rag = _get_rag_engine()
                     if rag:
-                        index_tables_for_rag(tables, rag)
+                        try:
+                            index_tables_for_rag(tables, rag)
+                        except Exception:
+                            pass
                     st.rerun()
 
         # Yuklenmis tablo ozeti

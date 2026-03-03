@@ -73,8 +73,11 @@ def render_bapi_agent():
                 # ══════════════════════════════════════════
                 rag = _get_rag_engine()
                 if rag:
-                    index_bapis_for_rag(bapis, rag)
-                    st.success(f"{len(bapis)} BAPI yuklendi ve indexlendi (RAG)")
+                    try:
+                        index_bapis_for_rag(bapis, rag)
+                        st.success(f"{len(bapis)} BAPI yuklendi ve indexlendi (RAG)")
+                    except Exception as e:
+                        st.warning(f"{len(bapis)} BAPI yuklendi (RAG indexleme hatasi: {e})")
                 else:
                     st.success(f"{len(bapis)} BAPI yuklendi")
 
@@ -90,7 +93,10 @@ def render_bapi_agent():
                     # RAG indexleme
                     rag = _get_rag_engine()
                     if rag:
-                        index_bapis_for_rag(bapis, rag)
+                        try:
+                            index_bapis_for_rag(bapis, rag)
+                        except Exception:
+                            pass
                     st.rerun()
 
         # Yuklenmis BAPI ozeti
