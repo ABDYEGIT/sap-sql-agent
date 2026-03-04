@@ -7,6 +7,7 @@ Mevcut Agent'lar:
   2. BAPI Asistani Agent - BAPI parametre doldurma rehberi
   3. SD/MM Agent - SQL ve BAPI agent'larini orkestre eden birlesik agent
   4. Fis Okuyucu Agent - GPT-4o Vision ile fis gorseli okuma ve masraf kaydi
+  5. IK Asistani Agent - IK dokumanlari uzerinde RAG tabanli soru-cevap
 """
 import sys
 from pathlib import Path
@@ -40,6 +41,7 @@ with st.sidebar:
         "BAPI Asistani": "bapi",
         "SD/MM Agent": "sdmm",
         "Fis Okuyucu": "receipt",
+        "IK Asistani": "ik",
     }
     selected_agent_label = st.selectbox(
         "Calismak istediginiz agent'i secin:",
@@ -69,3 +71,7 @@ elif selected_agent == "sdmm":
 elif selected_agent == "receipt":
     from receipt_agent.page import render_receipt_agent
     render_receipt_agent()
+
+elif selected_agent == "ik":
+    from ik_agent.page import render_ik_agent
+    render_ik_agent()

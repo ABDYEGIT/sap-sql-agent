@@ -374,17 +374,6 @@ def _handle_bapi_intent(prompt: str):
 
     st.markdown(response_text)
 
-    # BAPI parametre kartlari
-    if used_bapis:
-        for bapi_name in used_bapis:
-            if bapi_name in bapis:
-                with st.expander(f"Parametre Detaylari: {bapi_name}", expanded=True):
-                    html, height = create_bapi_parameter_html(
-                        bapi_name, bapis[bapi_name], used_bapis
-                    )
-                    if html:
-                        components.html(html, height=height, scrolling=True)
-
     # Asistan yanitini kaydet
     st.session_state["sdmm_chat_messages"].append({
         "role": "assistant",
