@@ -53,10 +53,25 @@ with st.sidebar:
 
     st.divider()
 
+    # Mimari butonu
+    if st.button("Proje Mimarisi", use_container_width=True, key="btn_arch"):
+        st.session_state["show_architecture"] = True
+        st.rerun()
+    if st.session_state.get("show_architecture"):
+        if st.button("Agentlara Don", use_container_width=True, key="btn_back"):
+            st.session_state["show_architecture"] = False
+            st.rerun()
+
+    st.divider()
+
 # ============================
 # SECILEN AGENT'I CALISTIR
 # ============================
-if selected_agent == "sql":
+if st.session_state.get("show_architecture"):
+    from architecture_page import render_architecture_page
+    render_architecture_page()
+
+elif selected_agent == "sql":
     from sql_agent.page import render_sql_agent
     render_sql_agent()
 

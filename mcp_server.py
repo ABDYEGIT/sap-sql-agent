@@ -53,7 +53,7 @@ from ik_agent.generator import generate_ik_response
 from ik_agent.document_loader import load_and_chunk_docx, get_default_document_path
 
 from receipt_agent.ocr_parser import parse_receipt_image
-from receipt_agent.legal_check import check_legal
+from receipt_agent.legal_check import check_legal, check_kalemler_legal
 from receipt_agent.db import init_receipt_db, save_receipt, get_all_receipts, get_receipt_count
 
 
@@ -361,12 +361,34 @@ def receipt_scan(image_path: str = "", image_base64: str = "", file_type: str = 
                 f"{item['birim_fiyat']:>9.2f} {item['toplam']:>9.2f}"
             )
 
-    # Yasal kontrol
+    # Fis turu seviyesinde yasal kontrol (tamamen alkol/sigara fisi)
     is_legal, legal_reason = check_legal(result.get("fis_turu", "diger"))
     if not is_legal:
         parts.append(f"\n*** YASAL UYARI: {legal_reason}")
         parts.append("Bu fis masraf olarak KAYDEDILEMEZ.")
         save = False
+
+    # Kalem seviyesinde yasal kontrol
+    kalem_kontrol = check_kalemler_legal(kalemler)
+    if kalem_kontrol["has_engellenen"] and is_legal:
+        parts.append("\n--- Engellenen Kalemler ---")
+        for eng in kalem_kontrol["engellenen_kalemler"]:
+            sebep_label = "Alkol" if eng["sebep"] == "alkol" else "Sigara/Tutun"
+            parts.append(f"  [ENGEL] {eng['urun']} - {eng['toplam']:.2f} TL ({sebep_label})")
+
+        orijinal_tutar = result.get("tutar", 0.0)
+        try:
+            orijinal_tutar = float(orijinal_tutar)
+        except (ValueError, TypeError):
+            orijinal_tutar = 0.0
+        ayarlanmis_tutar = max(0.0, orijinal_tutar - kalem_kontrol["engellenen_toplam"])
+        parts.append(f"\n  Orijinal tutar: {orijinal_tutar:.2f} TL")
+        parts.append(f"  Dusulen tutar: {kalem_kontrol['engellenen_toplam']:.2f} TL")
+        parts.append(f"  Kaydedilen tutar: {ayarlanmis_tutar:.2f} TL")
+
+        # Tutari ayarla ve sadece izinli kalemleri tut
+        result["tutar"] = ayarlanmis_tutar
+        result["kalemler"] = kalem_kontrol["izinli_kalemler"]
 
     # DB'ye kaydet
     if save and receipt_db_conn:

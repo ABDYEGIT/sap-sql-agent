@@ -57,9 +57,13 @@ KURALLAR:
 
 ONEMLI - KALEM DETAYLARI:
 - Fisteki her bir urunu/kalemi ayri ayri cikar
-- Her kalem icin: urun adi, adet, birim fiyat, toplam fiyat
+- Her kalem icin: urun adi, adet, birim fiyat, toplam fiyat, kategori
 - Kalemler "kalemler" listesinde dondurulecek
 - Eger kalemler okunamiyorsa bos liste dondur: []
+- Her kalem icin "kategori" alani ZORUNLU. Asagidaki seceneklerden birini sec:
+    - "alkol" → bira, sarap, raki, viski, vodka, cin, tekila, likör, kokteyl, efes, tuborg, carlsberg, bomonti vb.
+    - "sigara" → sigara, tutun, puro, pipo tutunu, marlboro, camel, parliament, kent, winston vb.
+    - "normal" → yukaridakilere UYMAYAN tum urunler
 
 KALEM OKUMA KURALLARI (COK ONEMLI):
 - Bir urun adi fiste birden fazla satira yayilmis olabilir (uzun isim). Bu durumda
@@ -87,7 +91,7 @@ ORNEK CIKTI:
     "kdv_orani": 10,
     "fis_turu": "yemek",
     "kalemler": [
-        {"urun": "Caffe Latte Grande", "adet": 2, "birim_fiyat": 35.00, "toplam": 70.00},
-        {"urun": "Cikolatali Muffin", "adet": 1, "birim_fiyat": 25.00, "toplam": 25.00}
+        {"urun": "Caffe Latte Grande", "adet": 2, "birim_fiyat": 35.00, "toplam": 70.00, "kategori": "normal"},
+        {"urun": "Cikolatali Muffin", "adet": 1, "birim_fiyat": 25.00, "toplam": 25.00, "kategori": "normal"}
     ]
 }"""

@@ -209,11 +209,15 @@ def parse_receipt_image(image_bytes: bytes, file_type: str = "jpeg") -> dict:
                         toplam = float(str(item.get("toplam", 0)).replace(",", ".").replace("TL", "").strip())
                     except (ValueError, TypeError):
                         toplam = birim_fiyat * adet
+                    kategori = str(item.get("kategori", "normal")).lower()
+                    if kategori not in ("alkol", "sigara", "normal"):
+                        kategori = "normal"
                     kalemler.append({
                         "urun": str(item["urun"]),
                         "adet": adet,
                         "birim_fiyat": birim_fiyat,
                         "toplam": toplam,
+                        "kategori": kategori,
                     })
         result["kalemler"] = kalemler
 
