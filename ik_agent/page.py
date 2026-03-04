@@ -188,33 +188,40 @@ def render_ik_agent():
                 with st.chat_message(msg["role"]):
                     st.markdown(msg["content"])
 
+            # Bekleyen soru varsa → LLM cagir ve cevabi goster
+            pending = st.session_state.get("ik_pending_question")
+            if pending:
+                with st.chat_message("assistant"):
+                    with st.spinner("IK dokumanlari arastiriliyor..."):
+                        rag = _get_rag_engine()
+                        history = st.session_state["ik_chat_messages"][:-1]
+
+                        response_text, sources = generate_ik_response(
+                            pending, rag, history
+                        )
+
+                    st.markdown(response_text)
+
+                # Yanitlari kaydet ve pending temizle
+                st.session_state["ik_chat_messages"].append({
+                    "role": "assistant",
+                    "content": response_text,
+                })
+                st.session_state["ik_last_sources"] = sources
+                st.session_state["ik_pending_question"] = None
+                st.rerun()
+
         # Chat input - container disinda, altta sabit kalir
         if not api_key:
             st.warning("OpenAI API anahtari bulunamadi.")
             st.chat_input("Soru sorun...", disabled=True, key="ik_chat_disabled")
         else:
             if prompt := st.chat_input("IK ile ilgili sorunuzu sorun...", key="ik_chat_input"):
-                # Kullanici mesajini kaydet ve goster
+                # Kullanici mesajini hemen kaydet
                 st.session_state["ik_chat_messages"].append({
                     "role": "user",
                     "content": prompt,
                 })
-
-                # Asistan yaniti
-                with st.spinner("IK dokumanlari arastiriliyor..."):
-                    rag = _get_rag_engine()
-                    history = st.session_state["ik_chat_messages"][:-1]
-
-                    response_text, sources = generate_ik_response(
-                        prompt, rag, history
-                    )
-
-                # Yanitlari kaydet
-                st.session_state["ik_chat_messages"].append({
-                    "role": "assistant",
-                    "content": response_text,
-                })
-                st.session_state["ik_last_sources"] = sources
-
-                # Kaynak panelini guncellemek icin rerun
+                # Soruyu pending olarak isaretle ve rerun → soru hemen gorunur
+                st.session_state["ik_pending_question"] = prompt
                 st.rerun()
