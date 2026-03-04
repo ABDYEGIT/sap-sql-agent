@@ -334,9 +334,21 @@ def _render_form_mode():
             for i, item in enumerate(kalemler):
                 c1, c2, c3, c4 = st.columns([3, 1, 1.5, 1.5])
                 c1.text_input("urun", value=item.get("urun", ""), key=f"k_urun_{i}", label_visibility="collapsed")
-                c2.number_input("adet", value=float(item.get("adet", 1)), min_value=0.0, step=1.0, key=f"k_adet_{i}", label_visibility="collapsed")
-                c3.number_input("birim", value=float(item.get("birim_fiyat", 0)), min_value=0.0, step=0.01, format="%.2f", key=f"k_birim_{i}", label_visibility="collapsed")
-                c4.number_input("toplam", value=float(item.get("toplam", 0)), min_value=0.0, step=0.01, format="%.2f", key=f"k_toplam_{i}", label_visibility="collapsed")
+                try:
+                    adet_v = max(0.0, float(item.get("adet", 1)))
+                except (ValueError, TypeError):
+                    adet_v = 1.0
+                try:
+                    birim_v = max(0.0, float(item.get("birim_fiyat", 0)))
+                except (ValueError, TypeError):
+                    birim_v = 0.0
+                try:
+                    toplam_v = max(0.0, float(item.get("toplam", 0)))
+                except (ValueError, TypeError):
+                    toplam_v = 0.0
+                c2.number_input("adet", value=adet_v, min_value=0.0, step=1.0, key=f"k_adet_{i}", label_visibility="collapsed")
+                c3.number_input("birim", value=birim_v, min_value=0.0, step=0.01, format="%.2f", key=f"k_birim_{i}", label_visibility="collapsed")
+                c4.number_input("toplam", value=toplam_v, min_value=0.0, step=0.01, format="%.2f", key=f"k_toplam_{i}", label_visibility="collapsed")
         else:
             st.info("Fiste kalem detayi okunamadi.")
 
