@@ -179,12 +179,16 @@ def render_ik_agent():
 
     # ── SOL PANEL: CHAT ──
     with chat_col:
-        # Chat gecmisini goster
-        for i, msg in enumerate(st.session_state["ik_chat_messages"]):
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
+        # Sabit yukseklikte scrollable chat alani
+        chat_container = st.container(height=500)
 
-        # Chat input
+        with chat_container:
+            # Chat gecmisini goster
+            for i, msg in enumerate(st.session_state["ik_chat_messages"]):
+                with st.chat_message(msg["role"]):
+                    st.markdown(msg["content"])
+
+        # Chat input - container disinda, altta sabit kalir
         if not api_key:
             st.warning("OpenAI API anahtari bulunamadi.")
             st.chat_input("Soru sorun...", disabled=True, key="ik_chat_disabled")
@@ -195,20 +199,15 @@ def render_ik_agent():
                     "role": "user",
                     "content": prompt,
                 })
-                with st.chat_message("user"):
-                    st.markdown(prompt)
 
                 # Asistan yaniti
-                with st.chat_message("assistant"):
-                    with st.spinner("IK dokumanlari arastiriliyor..."):
-                        rag = _get_rag_engine()
-                        history = st.session_state["ik_chat_messages"][:-1]
+                with st.spinner("IK dokumanlari arastiriliyor..."):
+                    rag = _get_rag_engine()
+                    history = st.session_state["ik_chat_messages"][:-1]
 
-                        response_text, sources = generate_ik_response(
-                            prompt, rag, history
-                        )
-
-                    st.markdown(response_text)
+                    response_text, sources = generate_ik_response(
+                        prompt, rag, history
+                    )
 
                 # Yanitlari kaydet
                 st.session_state["ik_chat_messages"].append({
