@@ -61,6 +61,19 @@ ONEMLI - KALEM DETAYLARI:
 - Kalemler "kalemler" listesinde dondurulecek
 - Eger kalemler okunamiyorsa bos liste dondur: []
 
+KALEM OKUMA KURALLARI (COK ONEMLI):
+- Bir urun adi fiste birden fazla satira yayilmis olabilir (uzun isim). Bu durumda
+  ikinci satir ayri bir kalem DEGILDIR, ayni urunun devam eden aciklamasidir.
+  Ornek: "BEYAZ PEYNIR 500GR" ve alt satirdaki "SUTLU" tek bir urun olabilir.
+- Bir kalemin TOPLAM FIYATI genellikle o satirin en saginda yazar.
+  Eger satir sonunda fiyat yoksa o satir bir onceki kalemin devami olabilir.
+- Adet genellikle "2x", "2 AD", "2*" gibi formatlarda yazar. Adet bilgisi yoksa 1 kabul et.
+- Birim fiyat = toplam / adet seklinde hesaplanabilir.
+- TOPLAM, KDV, TOPKDV, NAKIT, KART gibi satirlar kalem DEGILDIR, bunlari kalem listesine EKLEME.
+- Indirim veya iskonto satirlari kalem degildir, ekleme.
+- Kalemlerin toplam tutarlari toplandiginda fisteki TOPLAM tutara yakin olmalidir.
+  Eger toplamlar uyusmuyorsa fiyatlari tekrar kontrol et.
+
 ORNEK CIKTI:
 {
     "isletme_adi": "STARBUCKS COFFEE",
