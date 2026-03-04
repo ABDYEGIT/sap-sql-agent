@@ -287,23 +287,42 @@ def hr_policy_search(question: str) -> str:
 
 
 @mcp.tool()
-def receipt_scan(image_base64: str, file_type: str = "jpeg", save: bool = True) -> str:
+def receipt_scan(image_path: str = "", image_base64: str = "", file_type: str = "jpeg", save: bool = True) -> str:
     """
     Fis gorselini GPT-4o Vision ile okuyup yapilandirilmis veri cikarir.
 
-    Base64 kodlanmis JPEG/PNG gorsel alir, OCR ile isletme adi,
-    vergi no, tarih, tutar, KDV orani vb. alanlarini cikarir.
+    Dosya yolu VEYA base64 kodlanmis gorsel kabul eder.
+    OCR ile isletme adi, vergi no, tarih, tutar, KDV orani ve
+    kalem kalem urun detaylarini cikarir.
     Alkol/sigara fisleri yasal olarak masraf kaydedilemez.
 
     Args:
-        image_base64: Base64 kodlanmis gorsel verisi (data: prefixi gerekmez).
+        image_path: Fis gorselinin dosya yolu (ornek: "C:/Users/foto/fis.jpg").
+                    Bu parametre tercih edilir - dosyayi dogrudan okur.
+        image_base64: Alternatif: Base64 kodlanmis gorsel verisi.
         file_type: Gorsel formati - "jpeg", "jpg" veya "png".
         save: True ise okunan fisi veritabanina kaydeder.
     """
-    try:
-        image_bytes = base64.b64decode(image_base64)
-    except Exception as e:
-        return f"Base64 cozme hatasi: {e}"
+    # Gorsel verisini al: dosya yolu veya base64
+    if image_path:
+        img_path = Path(image_path)
+        if not img_path.exists():
+            return f"Hata: Dosya bulunamadi: {image_path}"
+        try:
+            image_bytes = img_path.read_bytes()
+            # Dosya uzantisindan file_type belirle
+            ext = img_path.suffix.lower().lstrip(".")
+            if ext in ("jpg", "jpeg", "png"):
+                file_type = ext
+        except Exception as e:
+            return f"Dosya okuma hatasi: {e}"
+    elif image_base64:
+        try:
+            image_bytes = base64.b64decode(image_base64)
+        except Exception as e:
+            return f"Base64 cozme hatasi: {e}"
+    else:
+        return "Hata: image_path veya image_base64 parametrelerinden biri gerekli."
 
     result = parse_receipt_image(image_bytes, file_type)
 
@@ -329,6 +348,18 @@ def receipt_scan(image_base64: str, file_type: str = "jpeg", save: bool = True) 
     }
     for key, label in field_labels.items():
         parts.append(f"  {label}: {result.get(key, 'N/A')}")
+
+    # Kalem detaylari
+    kalemler = result.get("kalemler", [])
+    if kalemler:
+        parts.append("\n--- Kalem Detaylari ---")
+        parts.append(f"  {'Urun':<30} {'Adet':>5} {'Birim':>10} {'Toplam':>10}")
+        parts.append(f"  {'-'*30} {'-'*5} {'-'*10} {'-'*10}")
+        for item in kalemler:
+            parts.append(
+                f"  {item['urun']:<30} {item['adet']:>5.0f} "
+                f"{item['birim_fiyat']:>9.2f} {item['toplam']:>9.2f}"
+            )
 
     # Yasal kontrol
     is_legal, legal_reason = check_legal(result.get("fis_turu", "diger"))

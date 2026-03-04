@@ -318,6 +318,28 @@ def _render_form_mode():
                 key="f_fis_turu",
             )
 
+        # ── Kalem Detaylari ──
+        st.divider()
+        st.subheader("Kalem Detaylari")
+
+        kalemler = parsed.get("kalemler", [])
+        if kalemler:
+            # Tablo baslik
+            hdr1, hdr2, hdr3, hdr4 = st.columns([3, 1, 1.5, 1.5])
+            hdr1.markdown("**Urun**")
+            hdr2.markdown("**Adet**")
+            hdr3.markdown("**Birim Fiyat**")
+            hdr4.markdown("**Toplam**")
+
+            for i, item in enumerate(kalemler):
+                c1, c2, c3, c4 = st.columns([3, 1, 1.5, 1.5])
+                c1.text_input("urun", value=item.get("urun", ""), key=f"k_urun_{i}", label_visibility="collapsed")
+                c2.number_input("adet", value=float(item.get("adet", 1)), min_value=0.0, step=1.0, key=f"k_adet_{i}", label_visibility="collapsed")
+                c3.number_input("birim", value=float(item.get("birim_fiyat", 0)), min_value=0.0, step=0.01, format="%.2f", key=f"k_birim_{i}", label_visibility="collapsed")
+                c4.number_input("toplam", value=float(item.get("toplam", 0)), min_value=0.0, step=0.01, format="%.2f", key=f"k_toplam_{i}", label_visibility="collapsed")
+        else:
+            st.info("Fiste kalem detayi okunamadi.")
+
         st.divider()
 
         # Butonlar
@@ -343,6 +365,22 @@ def _render_form_mode():
             st.error(f"MASRAF KAYDEDILEMEZ: {legal_msg}")
             return
 
+        # Kalemleri formdan topla
+        saved_kalemler = []
+        kalem_count = len(parsed.get("kalemler", []))
+        for i in range(kalem_count):
+            urun_val = st.session_state.get(f"k_urun_{i}", "")
+            adet_val = st.session_state.get(f"k_adet_{i}", 1)
+            birim_val = st.session_state.get(f"k_birim_{i}", 0)
+            toplam_val = st.session_state.get(f"k_toplam_{i}", 0)
+            if urun_val:
+                saved_kalemler.append({
+                    "urun": urun_val,
+                    "adet": adet_val,
+                    "birim_fiyat": birim_val,
+                    "toplam": toplam_val,
+                })
+
         # DB'ye kaydet
         receipt_data = {
             "isletme_adi": isletme_adi,
@@ -355,6 +393,7 @@ def _render_form_mode():
             "tutar": tutar,
             "kdv_orani": kdv_orani,
             "fis_turu": fis_turu,
+            "kalemler": saved_kalemler,
         }
 
         db_conn = get_receipt_db()

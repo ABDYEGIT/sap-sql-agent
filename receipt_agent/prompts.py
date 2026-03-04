@@ -55,6 +55,12 @@ KURALLAR:
 - Eger fiste alkol (bira, sarap, raki, viski vb.) veya sigara/tutun urunu varsa
   fis_turu'nu mutlaka "alkol" veya "sigara" olarak isaretle
 
+ONEMLI - KALEM DETAYLARI:
+- Fisteki her bir urunu/kalemi ayri ayri cikar
+- Her kalem icin: urun adi, adet, birim fiyat, toplam fiyat
+- Kalemler "kalemler" listesinde dondurulecek
+- Eger kalemler okunamiyorsa bos liste dondur: []
+
 ORNEK CIKTI:
 {
     "isletme_adi": "STARBUCKS COFFEE",
@@ -66,5 +72,9 @@ ORNEK CIKTI:
     "fis_no": "0030",
     "tutar": 95.00,
     "kdv_orani": 10,
-    "fis_turu": "yemek"
+    "fis_turu": "yemek",
+    "kalemler": [
+        {"urun": "Caffe Latte Grande", "adet": 2, "birim_fiyat": 35.00, "toplam": 70.00},
+        {"urun": "Cikolatali Muffin", "adet": 1, "birim_fiyat": 25.00, "toplam": 25.00}
+    ]
 }"""

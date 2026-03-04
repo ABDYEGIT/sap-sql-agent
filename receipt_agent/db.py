@@ -16,6 +16,7 @@ Tablo: FISLER
 
 DB Konumu: receipt_agent/receipts.db
 """
+import json
 import sqlite3
 from pathlib import Path
 
@@ -61,10 +62,18 @@ def init_receipt_db() -> sqlite3.Connection:
             tutar REAL,
             kdv_orani REAL,
             fis_turu TEXT,
+            kalemler TEXT DEFAULT '[]',
             olusturma_zamani TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             durum TEXT DEFAULT 'AKTIF'
         )
     """)
+
+    # Mevcut tabloya kalemler sutunu ekle (eski DB uyumlulugu)
+    try:
+        cursor.execute("ALTER TABLE FISLER ADD COLUMN kalemler TEXT DEFAULT '[]'")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Sutun zaten var
 
     conn.commit()
     return conn
@@ -113,11 +122,18 @@ def save_receipt(conn: sqlite3.Connection, data: dict) -> int:
     """
     cursor = conn.cursor()
 
+    # Kalemler listesini JSON string'e cevir
+    kalemler = data.get("kalemler", [])
+    if isinstance(kalemler, list):
+        kalemler_json = json.dumps(kalemler, ensure_ascii=False)
+    else:
+        kalemler_json = "[]"
+
     cursor.execute("""
         INSERT INTO FISLER (
             isletme_adi, adres, vergi_no, vergi_dairesi,
-            tarih, saat, fis_no, tutar, kdv_orani, fis_turu
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            tarih, saat, fis_no, tutar, kdv_orani, fis_turu, kalemler
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         data.get("isletme_adi", ""),
         data.get("adres", ""),
@@ -129,6 +145,7 @@ def save_receipt(conn: sqlite3.Connection, data: dict) -> int:
         float(data.get("tutar", 0)),
         float(data.get("kdv_orani", 0)),
         data.get("fis_turu", "diger"),
+        kalemler_json,
     ))
 
     conn.commit()

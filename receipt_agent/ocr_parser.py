@@ -66,6 +66,7 @@ EMPTY_RECEIPT = {
     "tutar": 0.0,
     "kdv_orani": 0.0,
     "fis_turu": "diger",
+    "kalemler": [],
 }
 
 
@@ -174,6 +175,8 @@ def parse_receipt_image(image_bytes: bytes, file_type: str = "jpeg") -> dict:
         # API'den gelmeyen alanlari "OKUNAMADI" ile doldur
         result = {**EMPTY_RECEIPT}
         for key in EMPTY_RECEIPT:
+            if key == "kalemler":
+                continue  # kalemler ayri islenir
             if key in parsed and parsed[key] is not None:
                 result[key] = parsed[key]
 
@@ -187,6 +190,32 @@ def parse_receipt_image(image_bytes: bytes, file_type: str = "jpeg") -> dict:
             result["kdv_orani"] = float(str(result["kdv_orani"]).replace("%", "").replace(",", ".").strip())
         except (ValueError, TypeError):
             result["kdv_orani"] = 0.0
+
+        # ── ADIM 5: Kalem (line item) verilerini isle ──
+        raw_kalemler = parsed.get("kalemler", [])
+        kalemler = []
+        if isinstance(raw_kalemler, list):
+            for item in raw_kalemler:
+                if isinstance(item, dict) and item.get("urun"):
+                    try:
+                        adet = float(str(item.get("adet", 1)).replace(",", "."))
+                    except (ValueError, TypeError):
+                        adet = 1
+                    try:
+                        birim_fiyat = float(str(item.get("birim_fiyat", 0)).replace(",", ".").replace("TL", "").strip())
+                    except (ValueError, TypeError):
+                        birim_fiyat = 0.0
+                    try:
+                        toplam = float(str(item.get("toplam", 0)).replace(",", ".").replace("TL", "").strip())
+                    except (ValueError, TypeError):
+                        toplam = birim_fiyat * adet
+                    kalemler.append({
+                        "urun": str(item["urun"]),
+                        "adet": adet,
+                        "birim_fiyat": birim_fiyat,
+                        "toplam": toplam,
+                    })
+        result["kalemler"] = kalemler
 
         return result
 
