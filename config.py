@@ -27,6 +27,11 @@ OPENAI_MODEL = "gpt-4o-mini"
 # text-embedding-3-small: 1536 boyutlu vektor, ucuz ve hizli
 EMBEDDING_MODEL = "text-embedding-3-small"
 
+# ── Vision modeli (Fis Okuyucu Agent - gorsel analiz icin) ──
+# gpt-4o: gorsel destekli multimodal model (OCR + analiz)
+# gpt-4o-mini gorsel desteklemiyor, bu yuzden gpt-4o kullanilir
+VISION_MODEL = "gpt-4o"
+
 # Platform ayarlari
 APP_TITLE = "Yorglass SAP AI Platform"
 APP_ICON = "\U0001f3ed"  # Fabrika emoji

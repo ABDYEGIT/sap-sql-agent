@@ -6,6 +6,7 @@ Mevcut Agent'lar:
   1. SQL Generator Agent - Dogal dilden SAP Open SQL sorgusu uretimi
   2. BAPI Asistani Agent - BAPI parametre doldurma rehberi
   3. SD/MM Agent - SQL ve BAPI agent'larini orkestre eden birlesik agent
+  4. Fis Okuyucu Agent - GPT-4o Vision ile fis gorseli okuma ve masraf kaydi
 """
 import sys
 from pathlib import Path
@@ -38,6 +39,7 @@ with st.sidebar:
         "SQL Generator": "sql",
         "BAPI Asistani": "bapi",
         "SD/MM Agent": "sdmm",
+        "Fis Okuyucu": "receipt",
     }
     selected_agent_label = st.selectbox(
         "Calismak istediginiz agent'i secin:",
@@ -63,3 +65,7 @@ elif selected_agent == "bapi":
 elif selected_agent == "sdmm":
     from sd_mm_agent.page import render_sdmm_agent
     render_sdmm_agent()
+
+elif selected_agent == "receipt":
+    from receipt_agent.page import render_receipt_agent
+    render_receipt_agent()
