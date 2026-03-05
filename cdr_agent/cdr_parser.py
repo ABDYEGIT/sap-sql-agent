@@ -25,6 +25,13 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from PIL import Image
 
+# PDF → gorsel cevirme icin fitz (PyMuPDF)
+try:
+    import fitz  # PyMuPDF
+    HAS_PYMUPDF = True
+except ImportError:
+    HAS_PYMUPDF = False
+
 from cdr_agent.prompts import CDR_VISION_PROMPT
 from token_tracker import log_token_usage
 
@@ -138,6 +145,40 @@ def extract_preview_from_cdr(cdr_bytes: bytes) -> bytes | None:
         offset = idx + 2
 
     return None  # Preview bulunamadi
+
+
+# ══════════════════════════════════════════════════════════════════════
+# PDF → GORSEL CEVIRME
+# ══════════════════════════════════════════════════════════════════════
+
+
+def extract_image_from_pdf(pdf_bytes: bytes) -> bytes | None:
+    """
+    PDF dosyasinin ilk sayfasini yuksek cozunurluklu gorsel olarak cikarir.
+
+    PyMuPDF (fitz) kullanarak PDF'i 200 DPI PNG'ye render eder.
+    Teknik resimler genelde tek sayfa oldugu icin sadece ilk sayfa alinir.
+
+    Returns:
+        PNG gorsel bytes veya None (PyMuPDF yoksa veya hata olursa).
+    """
+    if not HAS_PYMUPDF:
+        return None
+
+    try:
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        if doc.page_count == 0:
+            return None
+
+        page = doc[0]  # Ilk sayfa
+        # 200 DPI render (72 DPI varsayilan, 200/72 ≈ 2.78x zoom)
+        mat = fitz.Matrix(2.78, 2.78)
+        pix = page.get_pixmap(matrix=mat)
+        img_bytes = pix.tobytes("png")
+        doc.close()
+        return img_bytes
+    except Exception:
+        return None
 
 
 # ══════════════════════════════════════════════════════════════════════

@@ -14,7 +14,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from cdr_agent.cdr_parser import extract_preview_from_cdr, parse_cdr_image
+from cdr_agent.cdr_parser import extract_preview_from_cdr, extract_image_from_pdf, parse_cdr_image
 from cdr_agent.db import get_cdr_db, save_design, get_all_designs, get_design_count
 
 
@@ -72,7 +72,9 @@ def render_cdr_agent():
     if "cdr_parsed_data" not in st.session_state:
         st.session_state["cdr_parsed_data"] = None
     if "cdr_uploaded_image" not in st.session_state:
-        st.session_state["cdr_uploaded_image"] = None
+        st.session_state["cdr_uploaded_image"] = None  # Orijinal gorsel (yuksek cozunurluk)
+    if "cdr_preview_image" not in st.session_state:
+        st.session_state["cdr_preview_image"] = None  # Vision API icin kullanilan gorsel
 
     # ── DB baslat ──
     db_conn = get_cdr_db()
@@ -94,6 +96,7 @@ def render_cdr_agent():
                 st.session_state["cdr_mode"] = "upload"
                 st.session_state["cdr_parsed_data"] = None
                 st.session_state["cdr_uploaded_image"] = None
+                st.session_state["cdr_preview_image"] = None
                 st.rerun()
         with col2:
             if st.button("Gecmis", use_container_width=True, key="btn_cdr_history"):
@@ -114,7 +117,7 @@ def render_cdr_agent():
 
         st.caption(
             "**Desteklenen Formatlar:** .cdr (CorelDRAW X4+), "
-            ".png, .jpg, .jpeg"
+            ".png, .jpg, .jpeg, .pdf"
         )
 
     # ══════════════════════════════════════════
@@ -146,14 +149,15 @@ def _render_upload_mode():
 
     uploaded_file = st.file_uploader(
         "Teknik resim dosyasini yukleyin",
-        type=["cdr", "jpg", "jpeg", "png"],
+        type=["cdr", "jpg", "jpeg", "png", "pdf"],
         key="cdr_uploader",
-        help="CorelDRAW (.cdr) veya gorsel (JPG/PNG) formatinda teknik resim yukleyin",
+        help="CorelDRAW (.cdr), gorsel (JPG/PNG) veya PDF formatinda teknik resim yukleyin",
     )
 
     if uploaded_file is not None:
         file_ext = uploaded_file.name.rsplit(".", 1)[-1].lower() if "." in uploaded_file.name else ""
         is_cdr = file_ext == "cdr"
+        is_pdf = file_ext == "pdf"
         raw_bytes = uploaded_file.getvalue()
 
         col_img, col_info = st.columns([1, 1])
@@ -162,7 +166,9 @@ def _render_upload_mode():
             st.markdown("**Dosya Bilgileri:**")
             st.markdown(f"- **Ad:** {uploaded_file.name}")
             st.markdown(f"- **Boyut:** {uploaded_file.size / 1024:.1f} KB")
-            st.markdown(f"- **Format:** {'CorelDRAW (.cdr)' if is_cdr else file_ext.upper()}")
+            fmt_map = {"cdr": "CorelDRAW (.cdr)", "pdf": "PDF"}
+            fmt_label = fmt_map.get(file_ext, file_ext.upper())
+            st.markdown(f"- **Format:** {fmt_label}")
 
         # ── Gorsel preview ──
         preview_image_bytes = None
@@ -172,16 +178,27 @@ def _render_upload_mode():
                 with st.spinner("CDR onizleme cikariliyor..."):
                     preview_image_bytes = extract_preview_from_cdr(raw_bytes)
                 if preview_image_bytes:
-                    st.image(preview_image_bytes, caption="CDR Onizleme Gorseli", use_container_width=True)
+                    st.image(preview_image_bytes, caption="CDR Onizleme Gorseli")
                 else:
                     st.warning(
                         "CDR dosyasindan onizleme gorseli cikarilamadi. "
                         "Lutfen dosyayi CorelDRAW'dan PNG/JPG olarak export edin."
                     )
+        elif is_pdf:
+            with col_img:
+                with st.spinner("PDF gorsele cevriliyor..."):
+                    preview_image_bytes = extract_image_from_pdf(raw_bytes)
+                if preview_image_bytes:
+                    st.image(preview_image_bytes, caption="PDF Onizleme (Sayfa 1)")
+                else:
+                    st.warning(
+                        "PDF gorsele cevrilemedi. PyMuPDF yuklenmis olabilir. "
+                        "Lutfen PDF'i PNG/JPG olarak export edin."
+                    )
         else:
             preview_image_bytes = raw_bytes
             with col_img:
-                st.image(raw_bytes, caption="Yuklenen Teknik Resim", use_container_width=True)
+                st.image(raw_bytes, caption="Yuklenen Teknik Resim")
 
         st.divider()
 
@@ -207,13 +224,14 @@ def _render_upload_mode():
                 return
 
             st.session_state["cdr_parsed_data"] = parsed
-            st.session_state["cdr_uploaded_image"] = preview_image_bytes
+            st.session_state["cdr_uploaded_image"] = raw_bytes  # Orijinal dosya (tam cozunurluk)
+            st.session_state["cdr_preview_image"] = preview_image_bytes  # Vision icin kullanilan
             st.session_state["cdr_mode"] = "form"
             st.rerun()
     else:
         st.info(
             "Henuz dosya yuklenmedi. Yukaridaki alandan bir teknik resim "
-            "dosyasi yukleyin. Desteklenen formatlar: **CDR, JPG, JPEG, PNG**"
+            "dosyasi yukleyin. Desteklenen formatlar: **CDR, JPG, JPEG, PNG, PDF**"
         )
 
 
@@ -236,11 +254,11 @@ def _render_form_mode():
         st.warning("Okunan veri bulunamadi. Lutfen yeni analiz baslatin.")
         return
 
-    # ── Gorsel onizleme ──
+    # ── Gorsel onizleme (orijinal cozunurluk) ──
     image_bytes = st.session_state.get("cdr_uploaded_image")
     if image_bytes:
         with st.expander("Teknik Resim Gorseli", expanded=False):
-            st.image(image_bytes, caption="Analiz Edilen Resim", use_container_width=True)
+            st.image(image_bytes, caption="Analiz Edilen Resim")
 
     # ── OKUNAMADI uyarisi ──
     okunamadi_alanlar = [
@@ -379,11 +397,13 @@ def _render_form_mode():
         st.session_state["cdr_mode"] = "upload"
         st.session_state["cdr_parsed_data"] = None
         st.session_state["cdr_uploaded_image"] = None
+        st.session_state["cdr_preview_image"] = None
 
     if cancelled:
         st.session_state["cdr_mode"] = "upload"
         st.session_state["cdr_parsed_data"] = None
         st.session_state["cdr_uploaded_image"] = None
+        st.session_state["cdr_preview_image"] = None
         st.rerun()
 
 

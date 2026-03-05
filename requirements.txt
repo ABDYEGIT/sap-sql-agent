@@ -9,3 +9,4 @@ python-docx
 mcp>=1.0.0
 tabulate
 Pillow
+PyMuPDF

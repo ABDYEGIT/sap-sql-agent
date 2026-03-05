@@ -56,7 +56,7 @@ from receipt_agent.ocr_parser import parse_receipt_image
 from receipt_agent.legal_check import check_legal
 from receipt_agent.db import init_receipt_db, save_receipt, get_all_receipts, get_receipt_count
 
-from cdr_agent.cdr_parser import extract_preview_from_cdr, parse_cdr_image
+from cdr_agent.cdr_parser import extract_preview_from_cdr, extract_image_from_pdf, parse_cdr_image
 from cdr_agent.db import init_cdr_db, save_design, get_all_designs, get_design_count
 
 
@@ -442,9 +442,9 @@ def cdr_scan(image_path: str = "", image_base64: str = "", file_type: str = "jpe
     CDR dosyalari icin onizleme gorseli otomatik cikarilir.
 
     Args:
-        image_path: Teknik resim dosyasinin yolu (.cdr, .jpg, .png).
+        image_path: Teknik resim dosyasinin yolu (.cdr, .jpg, .png, .pdf).
         image_base64: Alternatif: Base64 kodlanmis gorsel verisi.
-        file_type: Gorsel formati - "jpeg", "jpg", "png" veya "cdr".
+        file_type: Gorsel formati - "jpeg", "jpg", "png", "cdr" veya "pdf".
         save: True ise sonuclari veritabanina kaydeder.
     """
     # Gorsel verisini al
@@ -457,6 +457,8 @@ def cdr_scan(image_path: str = "", image_base64: str = "", file_type: str = "jpe
             ext = img_path.suffix.lower().lstrip(".")
             if ext == "cdr":
                 file_type = "cdr"
+            elif ext == "pdf":
+                file_type = "pdf"
             elif ext in ("jpg", "jpeg", "png"):
                 file_type = ext
         except Exception as e:
@@ -469,13 +471,20 @@ def cdr_scan(image_path: str = "", image_base64: str = "", file_type: str = "jpe
     else:
         return "Hata: image_path veya image_base64 parametrelerinden biri gerekli."
 
-    # CDR dosyasi ise: preview cikart
+    # CDR / PDF dosyasi ise: gorsele cevir
     if file_type == "cdr":
         image_bytes = extract_preview_from_cdr(raw_bytes)
         if image_bytes is None:
             return (
                 "Hata: CDR dosyasindan onizleme gorseli cikarilamadi. "
                 "Lutfen dosyayi CorelDRAW'dan PNG veya JPG olarak export edin."
+            )
+    elif file_type == "pdf":
+        image_bytes = extract_image_from_pdf(raw_bytes)
+        if image_bytes is None:
+            return (
+                "Hata: PDF gorsele cevrilemedi. "
+                "Lutfen PDF'i PNG veya JPG olarak export edin."
             )
     else:
         image_bytes = raw_bytes
