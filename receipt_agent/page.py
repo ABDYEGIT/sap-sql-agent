@@ -318,17 +318,12 @@ def _render_form_mode():
                 key="f_fis_turu",
             )
 
-        # ── Kalem Detaylari ──
-        st.divider()
-        st.subheader("Kalem Detaylari")
-
+        # ── Kalem Yasal Kontrol (sadece uyari) ──
         kalemler = parsed.get("kalemler", [])
         if kalemler:
-            # Kalem seviyesinde yasal kontrol
             kalem_kontrol = check_kalemler_legal(kalemler)
-
-            # Engellenen kalemler varsa uyari goster
             if kalem_kontrol["has_engellenen"]:
+                st.divider()
                 engellenen_msg_parts = []
                 for eng in kalem_kontrol["engellenen_kalemler"]:
                     sebep_label = "Alkol" if eng["sebep"] == "alkol" else "Sigara/Tutun"
@@ -338,44 +333,8 @@ def _render_form_mode():
                     + "\n".join(engellenen_msg_parts)
                     + f"\n\n**Dusulen Tutar:** {kalem_kontrol['engellenen_toplam']:.2f} TL"
                 )
-
-            # Tablo baslik
-            hdr1, hdr2, hdr3, hdr4, hdr5 = st.columns([3, 1, 1.5, 1.5, 1])
-            hdr1.markdown("**Urun**")
-            hdr2.markdown("**Adet**")
-            hdr3.markdown("**Birim Fiyat**")
-            hdr4.markdown("**Toplam**")
-            hdr5.markdown("**Durum**")
-
-            for i, item in enumerate(kalemler):
-                kategori = str(item.get("kategori", "normal")).lower()
-                is_blocked = kategori in ("alkol", "sigara")
-
-                c1, c2, c3, c4, c5 = st.columns([3, 1, 1.5, 1.5, 1])
-                c1.text_input("urun", value=item.get("urun", ""), key=f"k_urun_{i}", label_visibility="collapsed")
-                try:
-                    adet_v = max(0.0, float(item.get("adet", 1)))
-                except (ValueError, TypeError):
-                    adet_v = 1.0
-                try:
-                    birim_v = max(0.0, float(item.get("birim_fiyat", 0)))
-                except (ValueError, TypeError):
-                    birim_v = 0.0
-                try:
-                    toplam_v = max(0.0, float(item.get("toplam", 0)))
-                except (ValueError, TypeError):
-                    toplam_v = 0.0
-                c2.number_input("adet", value=adet_v, min_value=0.0, step=1.0, key=f"k_adet_{i}", label_visibility="collapsed")
-                c3.number_input("birim", value=birim_v, min_value=0.0, step=0.01, format="%.2f", key=f"k_birim_{i}", label_visibility="collapsed")
-                c4.number_input("toplam", value=toplam_v, min_value=0.0, step=0.01, format="%.2f", key=f"k_toplam_{i}", label_visibility="collapsed")
-
-                if is_blocked:
-                    c5.markdown(":red[ENGEL]")
-                else:
-                    c5.markdown(":green[OK]")
         else:
             kalem_kontrol = {"has_engellenen": False, "engellenen_toplam": 0.0}
-            st.info("Fiste kalem detayi okunamadi.")
 
         st.divider()
 
@@ -402,26 +361,8 @@ def _render_form_mode():
             st.error(f"MASRAF KAYDEDILEMEZ: {legal_msg}")
             return
 
-        # Kalemleri formdan topla
-        saved_kalemler = []
-        kalem_count = len(parsed.get("kalemler", []))
-        original_kalemler = parsed.get("kalemler", [])
-        for i in range(kalem_count):
-            urun_val = st.session_state.get(f"k_urun_{i}", "")
-            adet_val = st.session_state.get(f"k_adet_{i}", 1)
-            birim_val = st.session_state.get(f"k_birim_{i}", 0)
-            toplam_val = st.session_state.get(f"k_toplam_{i}", 0)
-            kategori_val = original_kalemler[i].get("kategori", "normal") if i < len(original_kalemler) else "normal"
-            if urun_val:
-                saved_kalemler.append({
-                    "urun": urun_val,
-                    "adet": adet_val,
-                    "birim_fiyat": birim_val,
-                    "toplam": toplam_val,
-                    "kategori": kategori_val,
-                })
-
         # Kalem seviyesinde yasal kontrol - engellenen kalemlerin tutarini dus
+        saved_kalemler = parsed.get("kalemler", [])
         kalem_kontrol = check_kalemler_legal(saved_kalemler)
         dusulecek = kalem_kontrol["engellenen_toplam"]
         ayarlanmis_tutar = max(0.0, tutar - dusulecek)
