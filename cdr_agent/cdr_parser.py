@@ -20,6 +20,7 @@ import os
 import struct
 import zipfile
 from pathlib import Path
+from typing import Optional
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -85,7 +86,7 @@ EMPTY_CDR_RESULT = {
 # ══════════════════════════════════════════════════════════════════════
 
 
-def extract_preview_from_cdr(cdr_bytes: bytes) -> bytes | None:
+def extract_preview_from_cdr(cdr_bytes: bytes) -> Optional[bytes]:
     """
     CDR dosyasindan onizleme gorselini cikarir.
 
@@ -152,7 +153,7 @@ def extract_preview_from_cdr(cdr_bytes: bytes) -> bytes | None:
 # ══════════════════════════════════════════════════════════════════════
 
 
-def extract_image_from_pdf(pdf_bytes: bytes) -> bytes | None:
+def extract_image_from_pdf(pdf_bytes: bytes) -> Optional[bytes]:
     """
     PDF dosyasinin ilk sayfasini yuksek cozunurluklu gorsel olarak cikarir.
 
