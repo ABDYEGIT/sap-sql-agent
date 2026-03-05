@@ -98,16 +98,19 @@ def parse_receipt_image(image_bytes: bytes, file_type: str = "jpeg") -> dict:
         )
 
         # Token kullanimi kaydet
-        usage = response.usage
-        if usage:
-            log_token_usage(
-                agent_adi="Fis Okuyucu",
-                model=VISION_MODEL,
-                input_tokens=usage.prompt_tokens,
-                output_tokens=usage.completion_tokens,
-                total_tokens=usage.total_tokens,
-                islem_turu="OCR",
-            )
+        try:
+            usage = response.usage
+            if usage:
+                log_token_usage(
+                    agent_adi="Fis Okuyucu",
+                    model=VISION_MODEL,
+                    input_tokens=usage.prompt_tokens,
+                    output_tokens=usage.completion_tokens,
+                    total_tokens=usage.total_tokens,
+                    islem_turu="OCR",
+                )
+        except Exception:
+            pass  # Token loglama hatasi fis okumayı bozmasin
 
         # ADIM 3: JSON parse
         raw_content = response.choices[0].message.content.strip()
