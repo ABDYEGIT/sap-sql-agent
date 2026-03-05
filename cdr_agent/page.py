@@ -254,11 +254,12 @@ def _render_form_mode():
         st.warning("Okunan veri bulunamadi. Lutfen yeni analiz baslatin.")
         return
 
-    # ── Gorsel onizleme (orijinal cozunurluk) ──
-    image_bytes = st.session_state.get("cdr_uploaded_image")
-    if image_bytes:
+    # ── Gorsel onizleme ──
+    # CDR/PDF icin preview gorseli kullan (ham CDR/PDF st.image ile gosterilemez)
+    display_image = st.session_state.get("cdr_preview_image") or st.session_state.get("cdr_uploaded_image")
+    if display_image:
         with st.expander("Teknik Resim Gorseli", expanded=False):
-            st.image(image_bytes, caption="Analiz Edilen Resim")
+            st.image(display_image, caption="Analiz Edilen Resim")
 
     # ── OKUNAMADI uyarisi ──
     okunamadi_alanlar = [
