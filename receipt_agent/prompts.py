@@ -5,42 +5,47 @@ Bu prompt fis gorselini analiz edip yapilandirilmis JSON verisine
 cevirir. Bulanik, eksik veya egik fisleri de okuyabilir.
 """
 
-RECEIPT_OCR_PROMPT = """Sen bir fis okuma uzmanisin. Fis gorselini analiz et ve JSON dondur.
+RECEIPT_OCR_PROMPT = """Sen bir Turkiye fis okuma uzmanisin. Fis gorselini dikkatle oku ve JSON dondur.
+
+ONEMLI - TUTAR KURALLARI:
+- "tutar" = Fisteki EN BUYUK SAYI, yani GENEL TOPLAM / TOPLAM / TOTAL satirindaki deger.
+- "tutar" KDV TUTARI DEGILDIR! KDV tutari genelde kucuk bir sayidir.
+- Fiste "TOPLAM", "GENEL TOPLAM", "TOTAL", "TUTAR" yazan satirdaki sayiyi al.
+- "kdv_orani" = KDV yuzde orani (ornegin %1, %10, %20 gibi). Sayi olarak yaz (1, 10, 20).
+  Eger birden fazla KDV orani varsa en yuksek orani yaz.
 
 CIKARILACAK ALANLAR:
-- isletme_adi: Firma/magaza adi
+- isletme_adi: Fisteki firma/magaza adi (genelde en ustte buyuk harflerle yazar)
 - adres: Isletme adresi
 - vergi_no: VKN veya TCKN (10-11 haneli sayi)
 - vergi_dairesi: Vergi dairesi adi
 - tarih: GG.AA.YYYY formatinda
 - saat: SS:DD formatinda
-- fis_no: Fis veya Z numarasi
-- tutar: Toplam tutar (KDV dahil, sadece sayi)
-- kdv_orani: KDV yuzde orani (sadece sayi)
-- fis_turu: Asagidakilerden biri:
-  yemek, market, akaryakit, giyim, konaklama, ulasim,
-  alkol, sigara, saglik, egitim, teknoloji, diger
+- fis_no: Fis numarasi, Z numarasi veya belge numarasi
+- tutar: GENEL TOPLAM (fisteki en buyuk tutar, KDV dahil, sadece sayi)
+- kdv_orani: KDV yuzde orani (sadece sayi, ornek: 10)
+- fis_turu: yemek/market/akaryakit/giyim/konaklama/ulasim/alkol/sigara/saglik/egitim/teknoloji/diger
 - alkol_sigara_pisin: Fiste alkol veya sigara/tutun urunu var mi? true/false
 
 KURALLAR:
-- SADECE JSON dondur, baska bir sey yazma
+- SADECE JSON dondur, aciklama yazma
 - Okunamayan alanlar icin "OKUNAMADI" yaz
-- Tutar ve KDV icin sadece sayi dondur (virgul yerine nokta)
-- Eger fiste bira, sarap, raki, viski, vodka, efes, tuborg gibi alkol veya
-  marlboro, camel, parliament, sigara gibi tutun urunu VARSA:
+- Sayilarda virgul yerine nokta kullan (ornek: 1234.50)
+- Alkol (bira, sarap, raki, viski, vodka, efes, tuborg) veya
+  sigara (marlboro, camel, parliament, tutun) tespit edersen:
   fis_turu="alkol" veya "sigara", alkol_sigara_pisin=true
 
 ORNEK:
 {
-    "isletme_adi": "STARBUCKS COFFEE",
-    "adres": "Yesilpinar Mh. No.11 Eyup/Istanbul",
+    "isletme_adi": "MIGROS",
+    "adres": "Ataturk Cad. No:5 Kadikoy/Istanbul",
     "vergi_no": "7690310116",
-    "vergi_dairesi": "Bogazici VD",
+    "vergi_dairesi": "Kadikoy VD",
     "tarih": "18.01.2025",
-    "saat": "11:58",
-    "fis_no": "0030",
-    "tutar": 95.00,
+    "saat": "14:30",
+    "fis_no": "0042",
+    "tutar": 674.90,
     "kdv_orani": 10,
-    "fis_turu": "yemek",
+    "fis_turu": "market",
     "alkol_sigara_pisin": false
 }"""

@@ -86,7 +86,7 @@ def parse_receipt_image(image_bytes: bytes, file_type: str = "jpeg") -> dict:
                             "type": "image_url",
                             "image_url": {
                                 "url": data_url,
-                                "detail": "low",  # Hizli mod: fis icin yeterli
+                                "detail": "auto",  # Model cozunurlugu kendisi secsin
                             },
                         },
                     ],
