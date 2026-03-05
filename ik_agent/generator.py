@@ -15,6 +15,7 @@ from openai import OpenAI
 
 from ik_agent.prompts import IK_SYSTEM_PROMPT
 from config import OPENAI_MODEL, TEMPERATURE, MAX_TOKENS_RESPONSE
+from token_tracker import log_token_usage
 
 
 def _get_api_key() -> str:
@@ -116,6 +117,18 @@ def generate_ik_response(
         temperature=TEMPERATURE,
         max_tokens=MAX_TOKENS_RESPONSE,
     )
+
+    # Token kullanimi kaydet
+    usage = response.usage
+    if usage:
+        log_token_usage(
+            agent_adi="IK Asistani",
+            model=OPENAI_MODEL,
+            input_tokens=usage.prompt_tokens,
+            output_tokens=usage.completion_tokens,
+            total_tokens=usage.total_tokens,
+            islem_turu="Soru-Cevap",
+        )
 
     response_text = response.choices[0].message.content.strip()
 

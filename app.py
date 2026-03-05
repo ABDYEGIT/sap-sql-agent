@@ -19,6 +19,7 @@ import streamlit as st
 
 from config import APP_TITLE, APP_ICON
 from styles import inject_platform_css
+from token_tracker import get_token_summary, get_token_history, get_total_stats
 
 # ============================
 # SAYFA AYARLARI
@@ -56,10 +57,19 @@ with st.sidebar:
     # Mimari butonu
     if st.button("Proje Mimarisi", use_container_width=True, key="btn_arch"):
         st.session_state["show_architecture"] = True
+        st.session_state["show_token_usage"] = False
         st.rerun()
-    if st.session_state.get("show_architecture"):
+
+    # Token kullanim butonu
+    if st.button("Token Kullanimi", use_container_width=True, key="btn_token"):
+        st.session_state["show_token_usage"] = True
+        st.session_state["show_architecture"] = False
+        st.rerun()
+
+    if st.session_state.get("show_architecture") or st.session_state.get("show_token_usage"):
         if st.button("Agentlara Don", use_container_width=True, key="btn_back"):
             st.session_state["show_architecture"] = False
+            st.session_state["show_token_usage"] = False
             st.rerun()
 
     st.divider()
@@ -70,6 +80,36 @@ with st.sidebar:
 if st.session_state.get("show_architecture"):
     from architecture_page import render_architecture_page
     render_architecture_page()
+
+elif st.session_state.get("show_token_usage"):
+    st.title("Token Kullanim Raporu")
+    st.markdown("LLM API cagrilarinin agent bazinda token tuketim istatistikleri.")
+
+    # Genel istatistikler
+    stats = get_total_stats()
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Toplam Islem", stats["total_requests"])
+    c2.metric("Toplam Input Token", f"{stats['total_input']:,}")
+    c3.metric("Toplam Output Token", f"{stats['total_output']:,}")
+    c4.metric("Toplam Token", f"{stats['total_tokens']:,}")
+
+    st.divider()
+
+    # Agent bazinda ozet tablo
+    st.subheader("Agent Bazinda Ozet")
+    df_summary = get_token_summary()
+    if df_summary.empty:
+        st.info("Henuz token kullanim verisi yok. Fis Okuyucu veya IK Asistani agent'ini kullanin.")
+    else:
+        st.dataframe(df_summary, use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # Son islemler detay tablosu
+    st.subheader("Son Islemler (Detay)")
+    df_history = get_token_history(limit=30)
+    if not df_history.empty:
+        st.dataframe(df_history, use_container_width=True, hide_index=True)
 
 elif selected_agent == "sql":
     from sql_agent.page import render_sql_agent

@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from receipt_agent.prompts import RECEIPT_OCR_PROMPT
+from token_tracker import log_token_usage
 
 
 # ── Config'den VISION_MODEL'i al ──
@@ -95,6 +96,18 @@ def parse_receipt_image(image_bytes: bytes, file_type: str = "jpeg") -> dict:
             max_tokens=500,
             temperature=0.1,
         )
+
+        # Token kullanimi kaydet
+        usage = response.usage
+        if usage:
+            log_token_usage(
+                agent_adi="Fis Okuyucu",
+                model=VISION_MODEL,
+                input_tokens=usage.prompt_tokens,
+                output_tokens=usage.completion_tokens,
+                total_tokens=usage.total_tokens,
+                islem_turu="OCR",
+            )
 
         # ADIM 3: JSON parse
         raw_content = response.choices[0].message.content.strip()
