@@ -1,7 +1,7 @@
 """
 Yorglass SAP AI Platform - MCP Server.
 
-5 SAP AI tool'unu MCP (Model Context Protocol) uzerinden sunar.
+7 SAP AI tool'unu MCP (Model Context Protocol) uzerinden sunar.
 Claude Desktop veya herhangi bir MCP client bu tool'lari kullanabilir.
 
 Mevcut Streamlit uygulamasini ETKILEMEZ - ayri bir giris noktasidir.
@@ -56,6 +56,9 @@ from receipt_agent.ocr_parser import parse_receipt_image
 from receipt_agent.legal_check import check_legal
 from receipt_agent.db import init_receipt_db, save_receipt, get_all_receipts, get_receipt_count
 
+from cdr_agent.cdr_parser import extract_preview_from_cdr, parse_cdr_image
+from cdr_agent.db import init_cdr_db, save_design, get_all_designs, get_design_count
+
 
 # ══════════════════════════════════════════════════════════════════════
 # LOGGING
@@ -76,6 +79,7 @@ bapi_rag = None
 ik_rag = None
 mock_db_conn = None
 receipt_db_conn = None
+cdr_db_conn = None
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -87,7 +91,7 @@ mcp = FastMCP("yorglass-sap")
 def startup():
     """Tum kaynaklari yukler: API key, RAG motorlari, metadata, veritabanlari."""
     global api_key, sql_tables, sql_relationships, bapi_metadata
-    global sql_rag, bapi_rag, ik_rag, mock_db_conn, receipt_db_conn
+    global sql_rag, bapi_rag, ik_rag, mock_db_conn, receipt_db_conn, cdr_db_conn
 
     # ── API Key ──
     api_key = _resolve_api_key()
@@ -142,6 +146,10 @@ def startup():
     # ── Receipt DB ──
     receipt_db_conn = init_receipt_db()
     logger.info("Fis veritabani baslatildi.")
+
+    # ── CDR DB ──
+    cdr_db_conn = init_cdr_db()
+    logger.info("Teknik resim veritabani baslatildi.")
 
     logger.info("=== Yorglass MCP Server hazir ===")
 
@@ -408,6 +416,142 @@ def receipt_history(limit: int = 50) -> str:
     parts = [
         f"Toplam aktif fis: {count}",
         f"Gosterilen: {len(df)} fis",
+        "",
+    ]
+
+    try:
+        parts.append(df.to_markdown(index=False))
+    except ImportError:
+        parts.append(df.to_string(index=False))
+
+    return "\n".join(parts)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TOOL 6: CDR SCAN
+# ══════════════════════════════════════════════════════════════════════
+
+
+@mcp.tool()
+def cdr_scan(image_path: str = "", image_base64: str = "", file_type: str = "jpeg", save: bool = True) -> str:
+    """
+    Teknik resim gorselini veya CDR dosyasini GPT-4o Vision ile analiz eder.
+
+    Cam teknik resmi gorselinden boyut (en x boy), cam tipi,
+    kalinlik, musteri adi, siparis numarasi ve notlari cikarir.
+    CDR dosyalari icin onizleme gorseli otomatik cikarilir.
+
+    Args:
+        image_path: Teknik resim dosyasinin yolu (.cdr, .jpg, .png).
+        image_base64: Alternatif: Base64 kodlanmis gorsel verisi.
+        file_type: Gorsel formati - "jpeg", "jpg", "png" veya "cdr".
+        save: True ise sonuclari veritabanina kaydeder.
+    """
+    # Gorsel verisini al
+    if image_path:
+        img_path = Path(image_path)
+        if not img_path.exists():
+            return f"Hata: Dosya bulunamadi: {image_path}"
+        try:
+            raw_bytes = img_path.read_bytes()
+            ext = img_path.suffix.lower().lstrip(".")
+            if ext == "cdr":
+                file_type = "cdr"
+            elif ext in ("jpg", "jpeg", "png"):
+                file_type = ext
+        except Exception as e:
+            return f"Dosya okuma hatasi: {e}"
+    elif image_base64:
+        try:
+            raw_bytes = base64.b64decode(image_base64)
+        except Exception as e:
+            return f"Base64 cozme hatasi: {e}"
+    else:
+        return "Hata: image_path veya image_base64 parametrelerinden biri gerekli."
+
+    # CDR dosyasi ise: preview cikart
+    if file_type == "cdr":
+        image_bytes = extract_preview_from_cdr(raw_bytes)
+        if image_bytes is None:
+            return (
+                "Hata: CDR dosyasindan onizleme gorseli cikarilamadi. "
+                "Lutfen dosyayi CorelDRAW'dan PNG veya JPG olarak export edin."
+            )
+    else:
+        image_bytes = raw_bytes
+
+    result = parse_cdr_image(image_bytes, file_type)
+
+    if "_error" in result:
+        error_msg = result.pop("_error")
+        parts = [f"Analiz Uyarisi: {error_msg}"]
+    else:
+        parts = ["Teknik resim basariyla analiz edildi."]
+
+    # Sonuclari formatla
+    parts.append("\n--- Teknik Resim Verileri ---")
+    field_labels = {
+        "musteri_adi": "Musteri Adi",
+        "siparis_no": "Siparis No",
+        "parca_adi": "Parca Adi",
+        "en_mm": "En (mm)",
+        "boy_mm": "Boy (mm)",
+        "kalinlik_mm": "Kalinlik (mm)",
+        "cam_tipi": "Cam Tipi",
+        "adet": "Adet",
+        "kenar_isleme": "Kenar Isleme",
+        "delik_sayisi": "Delik Sayisi",
+        "notlar": "Notlar",
+    }
+    for key, label in field_labels.items():
+        parts.append(f"  {label}: {result.get(key, 'N/A')}")
+
+    # DB'ye kaydet
+    if save and cdr_db_conn:
+        try:
+            record_id = save_design(cdr_db_conn, result)
+            parts.append(f"\nVeritabanina kaydedildi (ID: {record_id})")
+        except Exception as e:
+            parts.append(f"\nKayit hatasi: {e}")
+
+    return "\n".join(parts)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TOOL 7: CDR HISTORY
+# ══════════════════════════════════════════════════════════════════════
+
+
+@mcp.tool()
+def cdr_history(limit: int = 50) -> str:
+    """
+    Daha once analiz edilen teknik resimlerin kayitlarini listeler.
+
+    Veritabanindaki tum aktif kayitlari musteri, siparis no,
+    boyut, cam tipi ve kayit zamani bilgileriyle dondurur.
+
+    Args:
+        limit: Maksimum kayit sayisi (varsayilan: 50).
+    """
+    if not cdr_db_conn:
+        return "Hata: Teknik resim veritabani baslatilmadi."
+
+    count = get_design_count(cdr_db_conn)
+
+    if count == 0:
+        return "Veritabaninda kayitli teknik resim bulunmuyor."
+
+    df = get_all_designs(cdr_db_conn)
+
+    if df.empty:
+        return "Aktif kayit bulunamadi."
+
+    if len(df) > limit:
+        df = df.head(limit)
+
+    parts = [
+        f"Toplam aktif kayit: {count}",
+        f"Gosterilen: {len(df)} kayit",
         "",
     ]
 

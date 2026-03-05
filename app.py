@@ -8,6 +8,7 @@ Mevcut Agent'lar:
   3. SD/MM Agent - SQL ve BAPI agent'larini orkestre eden birlesik agent
   4. Fis Okuyucu Agent - GPT-4o Vision ile fis gorseli okuma ve masraf kaydi
   5. IK Asistani Agent - IK dokumanlari uzerinde RAG tabanli soru-cevap
+  6. Teknik Resim Agent - CDR/gorsel cam teknik resim analizi ve boyut cikarimi
 """
 import sys
 from pathlib import Path
@@ -43,6 +44,7 @@ with st.sidebar:
         "SD/MM Agent": "sdmm",
         "Fis Okuyucu": "receipt",
         "IK Asistani": "ik",
+        "Teknik Resim": "cdr",
     }
     selected_agent_label = st.selectbox(
         "Calismak istediginiz agent'i secin:",
@@ -130,3 +132,7 @@ elif selected_agent == "receipt":
 elif selected_agent == "ik":
     from ik_agent.page import render_ik_agent
     render_ik_agent()
+
+elif selected_agent == "cdr":
+    from cdr_agent.page import render_cdr_agent
+    render_cdr_agent()
