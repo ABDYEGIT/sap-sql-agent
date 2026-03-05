@@ -12,7 +12,7 @@ islemlerini yoneten Streamlit arayuzu.
 import streamlit as st
 
 from receipt_agent.ocr_parser import parse_receipt_image
-from receipt_agent.legal_check import check_legal, check_kalemler_legal
+from receipt_agent.legal_check import check_legal
 from receipt_agent.db import get_receipt_db, save_receipt, get_all_receipts, get_receipt_count
 
 
@@ -318,23 +318,13 @@ def _render_form_mode():
                 key="f_fis_turu",
             )
 
-        # ── Kalem Yasal Kontrol (sadece uyari) ──
-        kalemler = parsed.get("kalemler", [])
-        if kalemler:
-            kalem_kontrol = check_kalemler_legal(kalemler)
-            if kalem_kontrol["has_engellenen"]:
-                st.divider()
-                engellenen_msg_parts = []
-                for eng in kalem_kontrol["engellenen_kalemler"]:
-                    sebep_label = "Alkol" if eng["sebep"] == "alkol" else "Sigara/Tutun"
-                    engellenen_msg_parts.append(f"- **{eng['urun']}** ({sebep_label}) - {eng['toplam']:.2f} TL")
-                st.warning(
-                    f"**Engellenen Kalemler** (masraf olarak kaydedilemez):\n"
-                    + "\n".join(engellenen_msg_parts)
-                    + f"\n\n**Dusulen Tutar:** {kalem_kontrol['engellenen_toplam']:.2f} TL"
-                )
-        else:
-            kalem_kontrol = {"has_engellenen": False, "engellenen_toplam": 0.0}
+        # ── Alkol/Sigara Uyarisi ──
+        if parsed.get("alkol_sigara_pisin", False):
+            st.divider()
+            st.warning(
+                "**Dikkat:** Bu fiste alkol veya sigara/tutun urunu tespit edildi. "
+                "Alkol ve sigara iceren fisler masraf olarak kaydedilemez."
+            )
 
         st.divider()
 
@@ -361,16 +351,7 @@ def _render_form_mode():
             st.error(f"MASRAF KAYDEDILEMEZ: {legal_msg}")
             return
 
-        # Kalem seviyesinde yasal kontrol - engellenen kalemlerin tutarini dus
-        saved_kalemler = parsed.get("kalemler", [])
-        kalem_kontrol = check_kalemler_legal(saved_kalemler)
-        dusulecek = kalem_kontrol["engellenen_toplam"]
-        ayarlanmis_tutar = max(0.0, tutar - dusulecek)
-
-        # Sadece izinli kalemleri kaydet
-        izinli_kalemler = kalem_kontrol["izinli_kalemler"]
-
-        # DB'ye kaydet (ayarlanmis tutar ile)
+        # DB'ye kaydet
         receipt_data = {
             "isletme_adi": isletme_adi,
             "adres": adres,
@@ -379,22 +360,14 @@ def _render_form_mode():
             "tarih": tarih,
             "saat": saat,
             "fis_no": fis_no,
-            "tutar": ayarlanmis_tutar,
+            "tutar": tutar,
             "kdv_orani": kdv_orani,
             "fis_turu": fis_turu,
-            "kalemler": izinli_kalemler,
+            "kalemler": [],
         }
 
         db_conn = get_receipt_db()
         receipt_id = save_receipt(db_conn, receipt_data)
-
-        if kalem_kontrol["has_engellenen"]:
-            eng_list = ", ".join(e["urun"] for e in kalem_kontrol["engellenen_kalemler"])
-            st.warning(
-                f"Engellenen kalemler dusuldu: {eng_list}\n\n"
-                f"Orijinal tutar: {tutar:.2f} TL → Kaydedilen tutar: {ayarlanmis_tutar:.2f} TL "
-                f"(Dusulen: {dusulecek:.2f} TL)"
-            )
         st.success(f"Fis basariyla kaydedildi! (ID: {receipt_id})")
         st.balloons()
 

@@ -28,9 +28,8 @@ OPENAI_MODEL = "gpt-4o-mini"
 EMBEDDING_MODEL = "text-embedding-3-small"
 
 # ── Vision modeli (Fis Okuyucu Agent - gorsel analiz icin) ──
-# gpt-4o: gorsel destekli multimodal model (OCR + analiz)
-# gpt-4o-mini gorsel desteklemiyor, bu yuzden gpt-4o kullanilir
-VISION_MODEL = "gpt-4o"
+# gpt-4o-mini: gorsel destekli, hizli ve ucuz (Temmuz 2024+)
+VISION_MODEL = "gpt-4o-mini"
 
 # Platform ayarlari
 APP_TITLE = "Yorglass SAP AI Platform"
