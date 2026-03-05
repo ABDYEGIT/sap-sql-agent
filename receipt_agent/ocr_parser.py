@@ -3,17 +3,28 @@ Fis Okuyucu Agent - GPT-4o-mini Vision ile Fis Okuma.
 
 Fis gorselini OpenAI Vision API'ye gonderir ve
 yapilandirilmis JSON verisi olarak geri alir.
+
+Token Optimizasyonu:
+  - Gorsel API'ye gonderilmeden once max 1024px'e kucultulur
+  - detail="low" ile sabit 85 token gorsel maliyeti
+  - Bu sayede ~2000+ token yerine ~85 token gorsel maliyeti
 """
 import base64
+import io
 import json
 import os
 from pathlib import Path
 
 from dotenv import load_dotenv
 from openai import OpenAI
+from PIL import Image
 
 from receipt_agent.prompts import RECEIPT_OCR_PROMPT
 from token_tracker import log_token_usage
+
+# ── Gorsel boyut limiti (piksel) ──
+# Uzun kenar bu degeri asmayacak sekilde kucultulur
+MAX_IMAGE_DIMENSION = 1024
 
 
 # ── Config'den VISION_MODEL'i al ──
@@ -66,14 +77,34 @@ def parse_receipt_image(image_bytes: bytes, file_type: str = "jpeg") -> dict:
         return {**EMPTY_RECEIPT, "_error": "API anahtari bulunamadi"}
 
     try:
-        # ADIM 1: base64 encoding
+        # ADIM 1: Gorseli kucult (token tasarrufu)
+        # Telefon kameralari 3000-4000+ px gorsel uretir.
+        # Bunu 1024px'e kucultmek tile sayisini dusurur.
+        try:
+            img = Image.open(io.BytesIO(image_bytes))
+            w, h = img.size
+            if max(w, h) > MAX_IMAGE_DIMENSION:
+                ratio = MAX_IMAGE_DIMENSION / max(w, h)
+                new_size = (int(w * ratio), int(h * ratio))
+                img = img.resize(new_size, Image.LANCZOS)
+
+            # JPEG olarak compress et (kalite 85, boyut kuculsun)
+            buf = io.BytesIO()
+            img_format = "JPEG"
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
+            img.save(buf, format=img_format, quality=85)
+            image_bytes = buf.getvalue()
+            file_type = "jpeg"
+        except Exception:
+            pass  # Kucultme basarisiz olursa orijinal gorsel kullanilir
+
+        # ADIM 2: base64 encoding
         base64_image = base64.b64encode(image_bytes).decode("utf-8")
+        data_url = f"data:image/jpeg;base64,{base64_image}"
 
-        mime_map = {"jpeg": "image/jpeg", "jpg": "image/jpeg", "png": "image/png"}
-        mime_type = mime_map.get(file_type.lower(), "image/jpeg")
-        data_url = f"data:{mime_type};base64,{base64_image}"
-
-        # ADIM 2: Vision API cagirisi
+        # ADIM 3: Vision API cagirisi
+        # detail="low" → sabit 85 token gorsel maliyeti (vs auto/high: 1000-2000+ token)
         client = OpenAI(api_key=api_key)
 
         response = client.chat.completions.create(
@@ -87,13 +118,13 @@ def parse_receipt_image(image_bytes: bytes, file_type: str = "jpeg") -> dict:
                             "type": "image_url",
                             "image_url": {
                                 "url": data_url,
-                                "detail": "auto",  # Model cozunurlugu kendisi secsin
+                                "detail": "low",
                             },
                         },
                     ],
                 }
             ],
-            max_tokens=500,
+            max_tokens=400,
             temperature=0.1,
         )
 
@@ -112,7 +143,7 @@ def parse_receipt_image(image_bytes: bytes, file_type: str = "jpeg") -> dict:
         except Exception:
             pass  # Token loglama hatasi fis okumayı bozmasin
 
-        # ADIM 3: JSON parse
+        # ADIM 4: JSON parse
         raw_content = response.choices[0].message.content.strip()
 
         json_str = raw_content
@@ -123,7 +154,7 @@ def parse_receipt_image(image_bytes: bytes, file_type: str = "jpeg") -> dict:
 
         parsed = json.loads(json_str)
 
-        # ADIM 4: Eksik alanlari tamamla
+        # ADIM 5: Eksik alanlari tamamla
         result = {**EMPTY_RECEIPT}
         for key in EMPTY_RECEIPT:
             if key in parsed and parsed[key] is not None:
