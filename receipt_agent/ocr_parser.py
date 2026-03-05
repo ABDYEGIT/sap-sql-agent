@@ -6,8 +6,8 @@ yapilandirilmis JSON verisi olarak geri alir.
 
 Token Optimizasyonu:
   - Gorsel API'ye gonderilmeden once max 1024px'e kucultulur
-  - detail="low" ile sabit 85 token gorsel maliyeti
-  - Bu sayede ~2000+ token yerine ~85 token gorsel maliyeti
+  - JPEG %85 kalitede sikistirilir
+  - Kucuk gorsel = daha az tile = daha az token
 """
 import base64
 import io
@@ -104,7 +104,8 @@ def parse_receipt_image(image_bytes: bytes, file_type: str = "jpeg") -> dict:
         data_url = f"data:image/jpeg;base64,{base64_image}"
 
         # ADIM 3: Vision API cagirisi
-        # detail="low" → sabit 85 token gorsel maliyeti (vs auto/high: 1000-2000+ token)
+        # detail="auto" → model cozunurlugu kendisi secsin (low tutar hatasi yapiyor)
+        # Gorsel zaten 1024px'e kucultuldu, tile sayisi sinirli olacak
         client = OpenAI(api_key=api_key)
 
         response = client.chat.completions.create(
@@ -118,13 +119,13 @@ def parse_receipt_image(image_bytes: bytes, file_type: str = "jpeg") -> dict:
                             "type": "image_url",
                             "image_url": {
                                 "url": data_url,
-                                "detail": "low",
+                                "detail": "auto",
                             },
                         },
                     ],
                 }
             ],
-            max_tokens=400,
+            max_tokens=500,
             temperature=0.1,
         )
 
