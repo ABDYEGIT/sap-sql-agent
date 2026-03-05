@@ -23,6 +23,7 @@ from bapi_agent.metadata_loader import (
     find_relevant_bapis_with_rag,
     format_bapi_metadata_for_prompt,
 )
+from token_tracker import log_token_usage
 
 
 def _get_api_key() -> str:
@@ -103,6 +104,22 @@ def generate_bapi_response(
             temperature=TEMPERATURE,
             max_tokens=MAX_TOKENS_RESPONSE,
         )
+
+        # Token kullanimi kaydet
+        try:
+            usage = response.usage
+            if usage:
+                log_token_usage(
+                    agent_adi="BAPI Asistani",
+                    model=OPENAI_MODEL,
+                    input_tokens=usage.prompt_tokens,
+                    output_tokens=usage.completion_tokens,
+                    total_tokens=usage.total_tokens,
+                    islem_turu="BAPI Onerisi",
+                )
+        except Exception:
+            pass
+
         content = response.choices[0].message.content
 
         used_bapis = extract_used_bapis(content, bapis)

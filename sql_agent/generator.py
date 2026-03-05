@@ -22,6 +22,7 @@ from sql_agent.metadata_loader import (
     find_relevant_tables_with_rag,
     format_metadata_for_prompt,
 )
+from token_tracker import log_token_usage
 
 
 def _get_api_key() -> str:
@@ -114,6 +115,22 @@ def generate_sql(
             temperature=TEMPERATURE,
             max_tokens=MAX_TOKENS_RESPONSE,
         )
+
+        # Token kullanimi kaydet
+        try:
+            usage = response.usage
+            if usage:
+                log_token_usage(
+                    agent_adi="SQL Generator",
+                    model=OPENAI_MODEL,
+                    input_tokens=usage.prompt_tokens,
+                    output_tokens=usage.completion_tokens,
+                    total_tokens=usage.total_tokens,
+                    islem_turu="SQL Uretimi",
+                )
+        except Exception:
+            pass
+
         content = response.choices[0].message.content
 
         # Yanittan kullanilan tablolari cikart

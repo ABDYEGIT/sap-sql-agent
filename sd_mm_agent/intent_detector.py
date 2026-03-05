@@ -21,6 +21,7 @@ from openai import OpenAI
 
 from config import OPENAI_MODEL
 from sd_mm_agent.prompts import INTENT_DETECTION_PROMPT
+from token_tracker import log_token_usage
 
 
 def _get_api_key() -> str:
@@ -85,6 +86,21 @@ def detect_intent(question: str) -> str:
             temperature=0.0,     # Deterministik yanit (her seferinde ayni sonuc)
             max_tokens=10,       # Sadece "SQL" veya "BAPI" bekliyoruz
         )
+
+        # Token kullanimi kaydet
+        try:
+            usage = response.usage
+            if usage:
+                log_token_usage(
+                    agent_adi="SD/MM Agent",
+                    model=OPENAI_MODEL,
+                    input_tokens=usage.prompt_tokens,
+                    output_tokens=usage.completion_tokens,
+                    total_tokens=usage.total_tokens,
+                    islem_turu="Intent Tespiti",
+                )
+        except Exception:
+            pass
 
         # ── Yaniti parse et ──
         result = response.choices[0].message.content.strip().upper()
