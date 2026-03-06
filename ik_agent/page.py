@@ -1,12 +1,10 @@
 """
 IK Agent - Streamlit Sayfa Modulu.
 
-IK Asistani agent'inin chat arayuzunu render eder.
-Sol tarafta sohbet, sag tarafta kaynak gosterim paneli.
-
-Layout: st.columns([2, 1])
-  Sol: Chat mesajlari + input
-  Sag: Son yanittan gelen kaynak referanslari
+IK Asistani agent'inin arayuzunu render eder.
+Iki tab icerir:
+  Tab 1: IK Chatbot - Soru-cevap (RAG tabanli)
+  Tab 2: CV Uygunluk Analizi - Toplu CV degerlendirme
 """
 from pathlib import Path
 
@@ -14,6 +12,10 @@ import streamlit as st
 
 from ik_agent.document_loader import load_and_chunk_docx, get_default_document_path
 from ik_agent.generator import generate_ik_response, _get_api_key
+from ik_agent.cv_analyzer import (
+    analyze_multiple_cvs,
+    format_criteria,
+)
 from rag_engine import RAGEngine
 
 
@@ -130,9 +132,27 @@ def render_ik_agent():
             st.markdown(f"- _{q}_")
 
     # ══════════════════════════════════════════
-    # ANA ICERIK - 2 KOLONLU LAYOUT
+    # ANA ICERIK - TAB YAPISI
     # ══════════════════════════════════════════
     st.title("IK Asistani")
+
+    tab_chatbot, tab_cv = st.tabs(["IK Chatbot", "CV Uygunluk Analizi"])
+
+    with tab_chatbot:
+        _render_chatbot_tab()
+
+    with tab_cv:
+        _render_cv_analyzer_tab()
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TAB 1: IK CHATBOT
+# ══════════════════════════════════════════════════════════════════════
+
+
+def _render_chatbot_tab():
+    """IK Chatbot tab icerigini render eder."""
+
     st.markdown(
         "Yorglass IK prosedur ve politikalari hakkinda sorularinizi sorun. "
         "Cevaplar **sirket IK dokumani** kaynakli olup, sag panelde "
@@ -145,7 +165,7 @@ def render_ik_agent():
             "IK dokumani yuklenemedi veya indexlenemedi. "
             "ik_agent/data/yorglass_ik_prosedur.docx dosyasini kontrol edin."
         )
-        st.stop()
+        return
 
     # ── 2 kolonlu layout ──
     chat_col, source_col = st.columns([2, 1])
@@ -175,7 +195,7 @@ def render_ik_agent():
                 if i < len(sources) - 1:
                     st.divider()
         else:
-            st.caption("Henuz bir soru sorulmadi. Soru sorduktan sonra cevabın kaynaklari burada gosterilecek.")
+            st.caption("Henuz bir soru sorulmadi. Soru sorduktan sonra cevabin kaynaklari burada gosterilecek.")
 
     # ── SOL PANEL: CHAT ──
     with chat_col:
@@ -212,6 +232,7 @@ def render_ik_agent():
                 st.rerun()
 
         # Chat input - container disinda, altta sabit kalir
+        api_key = _get_api_key()
         if not api_key:
             st.warning("OpenAI API anahtari bulunamadi.")
             st.chat_input("Soru sorun...", disabled=True, key="ik_chat_disabled")
@@ -225,3 +246,245 @@ def render_ik_agent():
                 # Soruyu pending olarak isaretle ve rerun → soru hemen gorunur
                 st.session_state["ik_pending_question"] = prompt
                 st.rerun()
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TAB 2: CV UYGUNLUK ANALIZI
+# ══════════════════════════════════════════════════════════════════════
+
+
+def _render_cv_analyzer_tab():
+    """CV Uygunluk Analizi tab icerigini render eder."""
+
+    st.markdown(
+        "Pozisyon kriterlerini belirleyin ve aday CV'lerini (PDF) yukleyin. "
+        "Sistem her CV'yi kriterlere gore puanlayip uygunluk sirasina gore listeler."
+    )
+
+    api_key = _get_api_key()
+    if not api_key:
+        st.warning("OpenAI API anahtari bulunamadi. CV analizi icin API anahtari gereklidir.")
+        return
+
+    # ── KRITER GIRISI ──
+    st.subheader("Pozisyon Kriterleri")
+
+    criteria_col1, criteria_col2 = st.columns(2)
+
+    with criteria_col1:
+        position = st.text_input(
+            "Pozisyon Adi",
+            placeholder="Ornek: Yazilim Gelistirici",
+            key="cv_position",
+        )
+        experience_years = st.number_input(
+            "Minimum Deneyim (Yil)",
+            min_value=0,
+            max_value=30,
+            value=0,
+            key="cv_experience",
+        )
+        education = st.selectbox(
+            "Egitim Seviyesi",
+            options=["", "Lise", "On Lisans", "Lisans", "Yuksek Lisans", "Doktora"],
+            key="cv_education",
+        )
+
+    with criteria_col2:
+        languages = st.text_input(
+            "Dil Gereksinimleri",
+            placeholder="Ornek: Ingilizce B2, Almanca A2",
+            key="cv_languages",
+        )
+        skills = st.text_input(
+            "Teknik Beceriler",
+            placeholder="Ornek: Python, React, SAP, AutoCAD",
+            key="cv_skills",
+        )
+        min_score = st.slider(
+            "Minimum Uygunluk Esigi (%)",
+            min_value=0,
+            max_value=100,
+            value=50,
+            key="cv_min_score",
+            help="Bu esik altindaki adaylar 'Uygun Degil' olarak isaretlenir.",
+        )
+
+    # Serbest metin (ek kriterler)
+    extra_criteria = st.text_area(
+        "Ek Kriterler (Opsiyonel)",
+        placeholder="Ornek: Seyahat engeli olmamali, esnek calisma saatlerine uyum saglayabilmeli...",
+        key="cv_extra_criteria",
+        height=80,
+    )
+
+    st.divider()
+
+    # ── CV YUKLEME ──
+    st.subheader("CV Dosyalari")
+
+    cv_files = st.file_uploader(
+        "PDF formatinda CV dosyalarini yukleyin",
+        type=["pdf"],
+        accept_multiple_files=True,
+        key="cv_files",
+        help="Birden fazla PDF dosyasi secebilirsiniz.",
+    )
+
+    if cv_files:
+        st.info(f"{len(cv_files)} adet CV yuklendi.")
+
+    st.divider()
+
+    # ── ANALIZ BUTONU ──
+    col_btn, col_space = st.columns([1, 3])
+    with col_btn:
+        analyze_clicked = st.button(
+            "Analiz Et",
+            type="primary",
+            use_container_width=True,
+            key="cv_analyze_btn",
+            disabled=not cv_files,
+        )
+
+    # ── ANALIZ ISLEMI ──
+    if analyze_clicked and cv_files:
+        # Kriter metnini olustur
+        criteria_text = format_criteria(
+            position=position,
+            experience_years=experience_years,
+            education=education,
+            languages=languages,
+            skills=skills,
+            extra_criteria=extra_criteria,
+        )
+
+        if criteria_text == "Genel degerlendirme yapiniz.":
+            st.warning("Lutfen en az bir kriter belirleyin.")
+            return
+
+        # Ilerleme cubugu
+        progress_bar = st.progress(0, text="CV'ler analiz ediliyor...")
+        status_text = st.empty()
+
+        def update_progress(i, total, filename):
+            progress = (i) / total
+            progress_bar.progress(progress, text=f"Analiz ediliyor: {filename} ({i+1}/{total})")
+            status_text.caption(f"Isleniyor: {filename}")
+
+        # Toplu analiz
+        results = analyze_multiple_cvs(
+            cv_files=cv_files,
+            criteria_text=criteria_text,
+            api_key=api_key,
+            progress_callback=update_progress,
+        )
+
+        progress_bar.progress(1.0, text="Analiz tamamlandi!")
+        status_text.empty()
+
+        # Sonuclari session state'e kaydet
+        st.session_state["cv_results"] = results
+        st.session_state["cv_min_score_used"] = min_score
+
+    # ── SONUCLARI GOSTER ──
+    results = st.session_state.get("cv_results")
+    if results:
+        _render_cv_results(results, st.session_state.get("cv_min_score_used", 50))
+
+
+# ══════════════════════════════════════════════════════════════════════
+# SONUC GOSTERIMI
+# ══════════════════════════════════════════════════════════════════════
+
+
+def _render_cv_results(results: list, min_score: int):
+    """CV analiz sonuclarini gorsel olarak render eder."""
+
+    st.subheader("Analiz Sonuclari")
+
+    # Uygun ve uygun olmayan ayirimi
+    uygun = [r for r in results if r.get("uygunluk_skoru", 0) >= min_score]
+    uygun_degil = [r for r in results if r.get("uygunluk_skoru", 0) < min_score]
+
+    # Ozet metrikler
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Toplam CV", len(results))
+    c2.metric("Uygun", len(uygun))
+    c3.metric("Elenen", len(uygun_degil))
+    if results:
+        avg_score = sum(r.get("uygunluk_skoru", 0) for r in results) / len(results)
+        c4.metric("Ortalama Skor", f"%{avg_score:.0f}")
+
+    st.divider()
+
+    # ── UYGUN ADAYLAR ──
+    if uygun:
+        st.markdown("### Uygun Adaylar")
+
+        for i, result in enumerate(uygun):
+            score = result.get("uygunluk_skoru", 0)
+            name = result.get("aday_adi", "Bilinmiyor")
+            filename = result.get("dosya_adi", "")
+            summary = result.get("ozet", "")
+
+            # Skor rengini belirle
+            if score >= 80:
+                score_color = "green"
+            elif score >= 60:
+                score_color = "orange"
+            else:
+                score_color = "red"
+
+            # Aday karti
+            with st.expander(
+                f"**#{i+1}** | {name} | Skor: %{score} | {filename}",
+                expanded=(i == 0),  # Ilk aday acik
+            ):
+                # Skor ve ozet
+                st.markdown(f"**Uygunluk Skoru:** :{score_color}[%{score}]")
+                st.markdown(f"**Ozet:** {summary}")
+
+                # Guclu ve zayif yonler
+                col_s, col_w = st.columns(2)
+
+                with col_s:
+                    st.markdown("**Guclu Yonler:**")
+                    for item in result.get("guclu_yonler", []):
+                        st.markdown(f"- {item}")
+
+                with col_w:
+                    st.markdown("**Zayif Yonler:**")
+                    for item in result.get("zayif_yonler", []):
+                        st.markdown(f"- {item}")
+
+                # Kriter detay
+                kriter_detay = result.get("kriter_detay", {})
+                if kriter_detay:
+                    st.markdown("**Kriter Bazli Puanlama:**")
+                    for kriter_adi, detay in kriter_detay.items():
+                        if isinstance(detay, dict):
+                            k_skor = detay.get("skor", 0)
+                            k_aciklama = detay.get("aciklama", "")
+                            st.markdown(f"- **{kriter_adi.title()}:** %{k_skor} - {k_aciklama}")
+
+    # ── ELENEN ADAYLAR ──
+    if uygun_degil:
+        st.divider()
+        st.markdown("### Elenen Adaylar")
+        st.caption(f"Minimum esik: %{min_score}")
+
+        for result in uygun_degil:
+            score = result.get("uygunluk_skoru", 0)
+            name = result.get("aday_adi", "Bilinmiyor")
+            filename = result.get("dosya_adi", "")
+            summary = result.get("ozet", "")
+
+            with st.expander(f"**{name}** | Skor: %{score} | {filename}"):
+                st.markdown(f"**Ozet:** {summary}")
+
+                zayif = result.get("zayif_yonler", [])
+                if zayif:
+                    st.markdown("**Elenme Nedenleri:**")
+                    for item in zayif:
+                        st.markdown(f"- {item}")
