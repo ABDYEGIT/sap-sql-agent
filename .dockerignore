@@ -1,0 +1,65 @@
+# ══════════════════════════════════════════════════════════════════
+# Docker build sirasinda kopyalanmayacak dosyalar
+# ══════════════════════════════════════════════════════════════════
+
+# Git
+.git
+.gitignore
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+dist/
+build/
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Environment (hassas bilgiler - container'a KOPYALANMAMALI)
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Streamlit (web serviste gerekli degil)
+.streamlit/
+pages/
+
+# ChromaDB veritabani (container icinde yeniden olusturulur)
+api_ik_documents/
+chroma_db/
+
+# SQLite veritabanlari
+*.db
+*.sqlite
+
+# Log dosyalari
+*.log
+
+# Test / dokumantasyon
+*.md
+*.bat
+*.ps1
+chatbot_example.jsx
+
+# Ngrok
+ngrok*
+
+# Claude
+.claude/
