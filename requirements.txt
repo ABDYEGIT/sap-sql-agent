@@ -10,3 +10,5 @@ mcp>=1.0.0
 tabulate
 Pillow
 PyMuPDF
+fastapi
+uvicorn[standard]
