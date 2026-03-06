@@ -20,9 +20,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
+import secrets
+
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Security, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import APIKeyHeader
 from openai import AzureOpenAI
 from pydantic import BaseModel, Field
 
@@ -64,6 +67,9 @@ AZURE_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "")
 AZURE_API_KEY = os.getenv("AZURE_OPENAI_API_KEY", "")
 AZURE_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-mini")
 AZURE_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
+
+# API Guvenlik Anahtari
+API_SECRET_KEY = os.getenv("API_SECRET_KEY", "")
 
 # CORS
 CORS_ORIGINS = [
@@ -129,6 +135,15 @@ async def lifespan(app: FastAPI):
     else:
         logger.error(f"IK dokumani bulunamadi: {ik_doc_path}")
 
+    # ── 4. API Key kontrolu ──
+    if not API_SECRET_KEY:
+        logger.warning(
+            "API_SECRET_KEY .env'de tanimli degil! "
+            "Guvenlik icin .env dosyasina ekleyin."
+        )
+    else:
+        logger.info("API Key guvenlik aktif.")
+
     logger.info("=== IK Chatbot API hazir ===")
     logger.info(f"CORS izinli origin'ler: {CORS_ORIGINS}")
 
@@ -159,6 +174,36 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ══════════════════════════════════════════════════════════════════════
+# API KEY GUVENLIK
+# ══════════════════════════════════════════════════════════════════════
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+async def verify_api_key(api_key: str = Security(api_key_header)):
+    """
+    Her istekte X-API-Key header'ini kontrol eder.
+    .env'de API_SECRET_KEY tanimli degilse guvenlik devre disi kalir.
+    """
+    # Key tanimli degilse guvenlik atlanir (gelistirme modu)
+    if not API_SECRET_KEY:
+        return None
+
+    if not api_key:
+        raise HTTPException(
+            status_code=401,
+            detail="API anahtari gerekli. Header'a 'X-API-Key' ekleyin.",
+        )
+
+    if not secrets.compare_digest(api_key, API_SECRET_KEY):
+        raise HTTPException(
+            status_code=403,
+            detail="Gecersiz API anahtari.",
+        )
+
+    return api_key
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -227,10 +272,11 @@ class ChatResponse(BaseModel):
     summary="IK sorusu sor",
     description="IK dokumanlarina dayali RAG tabanli soru-cevap.",
 )
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, _key: str = Depends(verify_api_key)):
     """
     IK sorusunu alir, RAG ile ilgili dokumanlari bulur,
     Azure OpenAI ile yanit uretir.
+    Guvenlik: X-API-Key header'i gereklidir.
     """
     # ── Kontroller ──
     if not ik_rag:

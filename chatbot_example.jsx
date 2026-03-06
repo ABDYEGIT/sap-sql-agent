@@ -13,6 +13,9 @@ import { useState, useCallback } from "react";
 // API adresi - sunucunuzun IP/domain'i ile degistirin
 const API_URL = "http://localhost:8000";
 
+// API Guvenlik Anahtari - .env'deki API_SECRET_KEY ile ayni olmali
+const API_KEY = "VWLzgNt3HNC3MjckuCfY9kSUCtNdPEgchsMF8wz3nRE";
+
 // ──────────────────────────────────────────────────────────────────
 // YONTEM 1: Custom Hook (onerilen)
 // ──────────────────────────────────────────────────────────────────
@@ -31,7 +34,7 @@ export function useChatbot() {
       try {
         const res = await fetch(`${API_URL}/api/chat`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
           body: JSON.stringify({
             message: message,
             chat_history: chatHistory,
@@ -81,7 +84,7 @@ export function useChatbot() {
 export async function askIKBot(message, chatHistory = []) {
   const res = await fetch(`${API_URL}/api/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
     body: JSON.stringify({
       message: message,
       chat_history: chatHistory,
