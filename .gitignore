@@ -9,3 +9,4 @@ __pycache__/
 nul
 *.db
 receipts.db
+chroma_db/
