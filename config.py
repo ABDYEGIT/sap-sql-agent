@@ -37,3 +37,7 @@ APP_ICON = "\U0001f3ed"  # Fabrika emoji
 MAX_CHAT_HISTORY = 10
 MAX_TOKENS_RESPONSE = 2000
 TEMPERATURE = 0.2
+
+# ── Multi-DB Metadata Dosya Yollari ──
+SAP_METADATA_EXCEL = "sql_agent/data/sap_metadata.xlsx"
+BW_METADATA_EXCEL = "sql_agent/data/bw_metadata.xlsx"

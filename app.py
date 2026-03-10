@@ -9,6 +9,7 @@ Mevcut Agent'lar:
   4. Fis Okuyucu Agent - GPT-4o Vision ile fis gorseli okuma ve masraf kaydi
   5. IK Asistani Agent - IK dokumanlari uzerinde RAG tabanli soru-cevap
   6. Teknik Resim Agent - CDR/gorsel cam teknik resim analizi ve boyut cikarimi
+  7. Uretim Optimizasyonu Agent - Duz cam uretim parametreleri ile fire orani tahmini
 """
 import sys
 from pathlib import Path
@@ -45,6 +46,7 @@ with st.sidebar:
         "Fis Okuyucu": "receipt",
         "IK Asistani": "ik",
         "Teknik Resim": "cdr",
+        "Uretim Optimizasyonu": "production",
     }
     selected_agent_label = st.selectbox(
         "Calismak istediginiz agent'i secin:",
@@ -136,3 +138,7 @@ elif selected_agent == "ik":
 elif selected_agent == "cdr":
     from cdr_agent.page import render_cdr_agent
     render_cdr_agent()
+
+elif selected_agent == "production":
+    from production_agent.page import render_production_agent
+    render_production_agent()

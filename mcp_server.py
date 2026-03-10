@@ -31,14 +31,17 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from mcp.server.fastmcp import FastMCP
 
 # ── Agent import'lari ──
-from config import _resolve_api_key
+from config import _resolve_api_key, SAP_METADATA_EXCEL, BW_METADATA_EXCEL
 from rag_engine import RAGEngine
 
 from sql_agent.generator import generate_sql, extract_sql_block
 from sql_agent.metadata_loader import (
     load_metadata_from_excel,
     index_tables_for_rag,
+    format_metadata_for_prompt,
 )
+from sql_agent.intent_classifier import classify_intent
+from sql_agent.diagram_generator import generate_flow_diagram, generate_er_diagram
 
 from bapi_agent.generator import generate_bapi_response
 from bapi_agent.metadata_loader import (
@@ -73,8 +76,11 @@ logger = logging.getLogger("yorglass-mcp")
 api_key = ""
 sql_tables = {}
 sql_relationships = []
+bw_tables = {}
+bw_relationships = []
 bapi_metadata = {}
 sql_rag = None
+bw_rag = None
 bapi_rag = None
 ik_rag = None
 mock_db_conn = None
@@ -90,8 +96,8 @@ mcp = FastMCP("yorglass-sap")
 
 def startup():
     """Tum kaynaklari yukler: API key, RAG motorlari, metadata, veritabanlari."""
-    global api_key, sql_tables, sql_relationships, bapi_metadata
-    global sql_rag, bapi_rag, ik_rag, mock_db_conn, receipt_db_conn, cdr_db_conn
+    global api_key, sql_tables, sql_relationships, bw_tables, bw_relationships, bapi_metadata
+    global sql_rag, bw_rag, bapi_rag, ik_rag, mock_db_conn, receipt_db_conn, cdr_db_conn
 
     # ── API Key ──
     api_key = _resolve_api_key()
@@ -100,20 +106,38 @@ def startup():
         return
     logger.info("API key basariyla yuklendi.")
 
-    # ── SQL Metadata + RAG ──
-    sql_excel = PROJECT_ROOT / "sql_agent" / "sample_metadata.xlsx"
-    if sql_excel.exists():
-        tables, rels, error = load_metadata_from_excel(str(sql_excel))
+    # ── SAP SQL Metadata + RAG ──
+    sap_excel = PROJECT_ROOT / SAP_METADATA_EXCEL
+    # Fallback: eski konum
+    if not sap_excel.exists():
+        sap_excel = PROJECT_ROOT / "sql_agent" / "sample_metadata.xlsx"
+    if sap_excel.exists():
+        tables, rels, error = load_metadata_from_excel(str(sap_excel))
         if error:
-            logger.error(f"SQL metadata hatasi: {error}")
+            logger.error(f"SAP metadata hatasi: {error}")
         else:
             sql_tables = tables
             sql_relationships = rels
             sql_rag = RAGEngine("mcp_sql_tables", api_key)
             index_tables_for_rag(sql_tables, sql_rag)
-            logger.info(f"SQL: {len(sql_tables)} tablo, RAG: {sql_rag.get_document_count()} doc")
+            logger.info(f"SAP: {len(sql_tables)} tablo, RAG: {sql_rag.get_document_count()} doc")
     else:
-        logger.warning(f"SQL metadata bulunamadi: {sql_excel}")
+        logger.warning(f"SAP metadata bulunamadi: {sap_excel}")
+
+    # ── BW Metadata + RAG ──
+    bw_excel = PROJECT_ROOT / BW_METADATA_EXCEL
+    if bw_excel.exists():
+        bw_tbl, bw_rel, error = load_metadata_from_excel(str(bw_excel))
+        if error:
+            logger.error(f"BW metadata hatasi: {error}")
+        else:
+            bw_tables = bw_tbl
+            bw_relationships = bw_rel
+            bw_rag = RAGEngine("mcp_bw_tables", api_key)
+            index_tables_for_rag(bw_tables, bw_rag)
+            logger.info(f"BW: {len(bw_tables)} tablo, RAG: {bw_rag.get_document_count()} doc")
+    else:
+        logger.warning(f"BW metadata bulunamadi: {bw_excel}")
 
     # ── BAPI Metadata + RAG ──
     bapi_excel = PROJECT_ROOT / "bapi_agent" / "bapi_sample_metadata.xlsx"
@@ -180,7 +204,7 @@ def sap_sql_query(question: str, execute: bool = True) -> str:
 
     response_text, used_tables = generate_sql(
         question, sql_tables, sql_relationships,
-        chat_history=[], rag_engine=sql_rag,
+        chat_history=[], rag_engine=sql_rag, db_type="SAP",
     )
 
     parts = [response_text]
@@ -205,6 +229,168 @@ def sap_sql_query(question: str, execute: bool = True) -> str:
                     parts.append("\nSorgu basarili, 0 kayit dondurdu.")
         else:
             parts.append("\n(Yanit icinde SQL blogu bulunamadi)")
+
+    if used_tables:
+        parts.append(f"\nKullanilan tablolar: {', '.join(used_tables)}")
+
+    return "\n".join(parts)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TOOL: SQL INTENT CLASSIFIER
+# ══════════════════════════════════════════════════════════════════════
+
+
+@mcp.tool()
+def sql_classify_intent(question: str) -> str:
+    """
+    Sorunun BW (raporlama) mi SAP (transactional) mi oldugunu belirler.
+
+    Kullanicinin dogal dil sorusunu analiz ederek hangi veritabaninda
+    aranmasi gerektigine karar verir.
+
+    Args:
+        question: Turkce dogal dil sorusu.
+                  Ornekler: "Aylik satis trendi" → BW,
+                  "Malzeme 1234 stoku" → SAP
+    """
+    if not api_key:
+        return "Hata: API key yuklenemedi."
+
+    result = classify_intent(question, api_key)
+    import json
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TOOL: SQL LIST TABLES
+# ══════════════════════════════════════════════════════════════════════
+
+
+@mcp.tool()
+def sql_list_tables(db: str = "SAP") -> str:
+    """
+    Secilen veritabanindaki (SAP veya BW) tablolari ve alan sayilarini listeler.
+
+    Args:
+        db: Veritabani secimi - "SAP" veya "BW".
+    """
+    tables = sql_tables if db.upper() == "SAP" else bw_tables
+    if not tables:
+        return f"Hata: {db.upper()} metadata yuklenemedi."
+
+    parts = [f"=== {db.upper()} Tablolari ({len(tables)} adet) ===\n"]
+    for name, data in sorted(tables.items()):
+        fields = data.get("fields", [])
+        pk_fields = [f["name"] for f in fields if f.get("key") == "PK"]
+        pk_text = ", ".join(pk_fields) if pk_fields else "-"
+        parts.append(f"  {name} ({len(fields)} alan, PK: {pk_text})")
+
+    return "\n".join(parts)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TOOL: SQL GET SCHEMA
+# ══════════════════════════════════════════════════════════════════════
+
+
+@mcp.tool()
+def sql_get_schema(table_name: str, db: str = "SAP") -> str:
+    """
+    Belirtilen tablonun kolon bilgilerini doner.
+
+    Args:
+        table_name: Tablo adi (ornek: "MARA", "ZBWSD_C01").
+        db: Veritabani secimi - "SAP" veya "BW".
+    """
+    tables = sql_tables if db.upper() == "SAP" else bw_tables
+    if not tables:
+        return f"Hata: {db.upper()} metadata yuklenemedi."
+
+    table_name_upper = table_name.strip().upper()
+    table_data = tables.get(table_name_upper)
+    if not table_data:
+        available = ", ".join(sorted(tables.keys()))
+        return f"Tablo bulunamadi: {table_name_upper}\nMevcut tablolar: {available}"
+
+    parts = [f"=== {table_name_upper} ({db.upper()}) ===\n"]
+    parts.append(f"{'Alan':<20} {'Tip':<15} {'Anahtar':<8} Aciklama")
+    parts.append("-" * 70)
+    for field in table_data.get("fields", []):
+        parts.append(
+            f"{field['name']:<20} {field['data_type']:<15} "
+            f"{field.get('key', ''):<8} {field['description']}"
+        )
+
+    return "\n".join(parts)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TOOL: SQL GENERATE (Multi-DB + Diagram)
+# ══════════════════════════════════════════════════════════════════════
+
+
+@mcp.tool()
+def sql_generate(question: str, db: str = "auto") -> str:
+    """
+    Dogal dilden SQL sorgusu uretir. Mermaid diagram ile birlikte doner.
+
+    db="auto" ise intent classifier ile BW/SAP otomatik secilir.
+    db="SAP" veya db="BW" ile manuel secim de yapilabilir.
+
+    Args:
+        question: Turkce dogal dil sorusu.
+        db: Hedef veritabani - "auto", "SAP" veya "BW".
+    """
+    if not api_key:
+        return "Hata: API key yuklenemedi."
+
+    # ── Intent Classification ──
+    if db.upper() == "AUTO":
+        intent = classify_intent(question, api_key)
+        target_db = intent["db"]
+    else:
+        target_db = db.upper()
+        intent = {"db": target_db, "confidence": 1.0, "reason": "Manuel secim"}
+
+    # ── DB'ye gore metadata ve RAG sec ──
+    if target_db == "BW":
+        tables = bw_tables
+        rels = bw_relationships
+        rag = bw_rag
+    else:
+        tables = sql_tables
+        rels = sql_relationships
+        rag = sql_rag
+
+    if not tables:
+        return f"Hata: {target_db} metadata yuklenemedi."
+
+    # ── SQL Uret ──
+    response_text, used_tables = generate_sql(
+        question, tables, rels,
+        chat_history=[], rag_engine=rag, db_type=target_db,
+    )
+
+    # ── Mermaid Diagramlari Uret ──
+    sql_block = extract_sql_block(response_text)
+
+    flow_diagram = generate_flow_diagram(question, intent, used_tables, sql_block)
+    er_diagram = generate_er_diagram(used_tables, tables, rels)
+
+    # ── Sonucu birlesitir ──
+    parts = [
+        f"[Intent: {target_db} | Guven: %{int(intent['confidence']*100)} | Sebep: {intent['reason']}]\n",
+        response_text,
+        "\n--- Akis Diagrami (Mermaid) ---",
+        f"```mermaid\n{flow_diagram}\n```",
+    ]
+
+    if er_diagram:
+        parts.extend([
+            "\n--- ER Diagrami (Mermaid) ---",
+            f"```mermaid\n{er_diagram}\n```",
+        ])
 
     if used_tables:
         parts.append(f"\nKullanilan tablolar: {', '.join(used_tables)}")

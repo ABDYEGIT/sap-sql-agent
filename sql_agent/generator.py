@@ -2,6 +2,7 @@
 SQL Agent - LLM ile SAP Open SQL Sorgusu Uretimi.
 
 OpenAI API kullanarak dogal dil sorusundan SAP Open SQL sorgusu uretir.
+Multi-DB destegi: SAP (transactional) ve BW (Business Warehouse).
 
 RAG ENTEGRASYONU:
 - find_relevant_tables_with_rag() ile vector search yapilir
@@ -18,6 +19,7 @@ from openai import OpenAI
 
 from config import OPENAI_MODEL, MAX_CHAT_HISTORY, MAX_TOKENS_RESPONSE, TEMPERATURE
 from sql_agent.prompts import get_system_prompt
+from sql_agent.bw_prompts import get_bw_system_prompt
 from sql_agent.metadata_loader import (
     find_relevant_tables_with_rag,
     format_metadata_for_prompt,
@@ -57,6 +59,7 @@ def generate_sql(
     relationships: list,
     chat_history: list,
     rag_engine=None,
+    db_type: str = "SAP",
 ) -> tuple:
     """
     Dogal dil sorusundan SAP Open SQL sorgusu uretir.
@@ -69,6 +72,7 @@ def generate_sql(
         relationships: Iliski listesi
         chat_history: Onceki mesajlar
         rag_engine: RAGEngine instance (None ise tum tablolar kullanilir)
+        db_type: Hedef veritabani ("SAP" veya "BW")
 
     Returns:
         (full_response_text, list_of_used_table_names)
@@ -95,7 +99,12 @@ def generate_sql(
 
     # ── AUGMENTATION: Bulunan tablolari LLM prompt'una ekle ──
     metadata_text = format_metadata_for_prompt(relevant_tables, relevant_rels)
-    system_prompt = get_system_prompt(metadata_text)
+
+    # DB tipine gore uygun prompt sec
+    if db_type.upper() == "BW":
+        system_prompt = get_bw_system_prompt(metadata_text)
+    else:
+        system_prompt = get_system_prompt(metadata_text)
 
     messages = [{"role": "system", "content": system_prompt}]
 
